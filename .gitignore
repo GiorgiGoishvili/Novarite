@@ -141,3 +141,20 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# ── Anchor / Solana ───────────────────────────────────────────────────────────
+# Local validator state, test ledger, and generated IDL/type files live here
+.anchor/
+
+# Rust / Cargo build output
+target/
+
+# ── Next.js (frontend) ────────────────────────────────────────────────────────
+# Redundant with the bare `.next` rule above, but explicit for clarity
+frontend/.next/
+frontend/out/
+
+# ── OS & editor ───────────────────────────────────────────────────────────────
+.vscode/
+.DS_Store
+Thumbs.db

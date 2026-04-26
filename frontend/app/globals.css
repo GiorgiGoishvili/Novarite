@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: #0d0c0f;
+    color: #e4ddd0;
+    font-family: var(--font-inter), system-ui, sans-serif;
+    line-height: 1.65;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: #0d0c0f; }
+  ::-webkit-scrollbar-thumb { background: #342f47; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #463f5c; }
+
+  ::selection {
+    background: rgba(184, 50, 50, 0.35);
+    color: #e4ddd0;
+  }
+}
+
+@layer utilities {
+  /* Gold shimmer text */
+  .text-gold {
+    background: linear-gradient(
+      135deg,
+      #c09530 0%,
+      #e8b848 45%,
+      #c09530 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Thin horizontal rule that fades at both ends */
+  .rule-fade {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      #342f47 30%,
+      #342f47 70%,
+      transparent 100%
+    );
+  }
+
+  /* Section-level ambient top/bottom fade */
+  .section-mask {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      black 6%,
+      black 94%,
+      transparent
+    );
+  }
+
+  /* Card border that subtly catches light at top */
+  .card-border {
+    border: 1px solid #26223a;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.55),
+                inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .card-border:hover {
+    border-color: #342f47;
+    box-shadow: 0 10px 44px rgba(0, 0, 0, 0.75),
+                0 0 20px rgba(192, 149, 48, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  /* Dot-matrix background helper */
+  .bg-dots {
+    background-image: radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+}

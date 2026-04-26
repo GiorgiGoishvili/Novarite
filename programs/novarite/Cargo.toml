@@ -1,0 +1,23 @@
+[package]
+name = "novarite"
+version = "0.1.0"
+description = "Novarite — Solana-powered indie game platform"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "novarite"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[lints.rust]
+unexpected_cfgs = "allow"
+
+[dependencies]
+anchor-lang = "0.32.1"
