@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Cinzel, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import "@solana/wallet-adapter-react-ui/styles.css";
+import NovariteWalletProvider from "../components/WalletProvider";
 
 const cinzel = Cinzel({
   subsets: ["latin"],
@@ -39,7 +41,9 @@ export default function RootLayout({
       lang="en"
       className={`${cinzel.variable} ${inter.variable} ${mono.variable}`}
     >
-      <body className="bg-nr-void text-nr-bone antialiased">{children}</body>
+      <body className="bg-nr-void text-nr-bone antialiased">
+        <NovariteWalletProvider>{children}</NovariteWalletProvider>
+      </body>
     </html>
   );
 }

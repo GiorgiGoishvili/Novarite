@@ -16,6 +16,10 @@ pub mod novarite {
         config.authority = ctx.accounts.authority.key();
         config.platform_fee_bps = platform_fee_bps;
         config.bump = ctx.bumps.platform_config;
+        emit!(PlatformInitialized {
+            authority: ctx.accounts.authority.key(),
+            platform_fee_bps,
+        });
         Ok(())
     }
 
@@ -34,6 +38,10 @@ pub mod novarite {
         profile.profile_uri = profile_uri;
         profile.created_at = Clock::get()?.unix_timestamp;
         profile.bump = ctx.bumps.developer_profile;
+        emit!(DeveloperRegistered {
+            authority: profile.authority,
+            studio_name: profile.studio_name.clone(),
+        });
         Ok(())
     }
 
@@ -50,13 +58,18 @@ pub mod novarite {
         require!(metadata_uri.len() <= 200, NovariteError::MetadataUriTooLong);
 
         let listing = &mut ctx.accounts.game_listing;
-        listing.developer = ctx.accounts.developer_profile.key();
+        listing.developer = ctx.accounts.developer_profile.authority;
         listing.game_slug = game_slug;
         listing.title = title;
         listing.metadata_uri = metadata_uri;
         listing.price_lamports = price_lamports;
         listing.created_at = Clock::get()?.unix_timestamp;
         listing.bump = ctx.bumps.game_listing;
+        emit!(GamePublished {
+            developer: listing.developer,
+            game_slug: listing.game_slug.clone(),
+            price_lamports: listing.price_lamports,
+        });
         Ok(())
     }
 
@@ -79,11 +92,35 @@ pub mod novarite {
             )?;
         }
 
+        let fee_bps = ctx.accounts.platform_config.platform_fee_bps as u64;
+        if fee_bps > 0 {
+            let fee = price * fee_bps / 10_000;
+            if fee > 0 {
+                let fee_ix = anchor_lang::solana_program::system_instruction::transfer(
+                    &ctx.accounts.player.key(),
+                    &ctx.accounts.platform_authority.key(),
+                    fee,
+                );
+                anchor_lang::solana_program::program::invoke(
+                    &fee_ix,
+                    &[
+                        ctx.accounts.player.to_account_info(),
+                        ctx.accounts.platform_authority.to_account_info(),
+                    ],
+                )?;
+            }
+        }
+
         let pass = &mut ctx.accounts.access_pass;
         pass.game = ctx.accounts.game_listing.key();
         pass.player = ctx.accounts.player.key();
         pass.purchased_at = Clock::get()?.unix_timestamp;
         pass.bump = ctx.bumps.access_pass;
+        emit!(AccessPassPurchased {
+            game: pass.game,
+            player: pass.player,
+            price_lamports: price,
+        });
         Ok(())
     }
 
@@ -100,6 +137,53 @@ pub mod novarite {
         reward.reward_id = reward_id;
         reward.claimed_at = Clock::get()?.unix_timestamp;
         reward.bump = ctx.bumps.player_reward;
+        emit!(RewardClaimed {
+            game: reward.game,
+            player: reward.player,
+            reward_id: reward.reward_id.clone(),
+        });
+        Ok(())
+    }
+
+    pub fn update_game(
+        ctx: Context<UpdateGame>,
+        title: Option<String>,
+        metadata_uri: Option<String>,
+        price_lamports: Option<u64>,
+    ) -> Result<()> {
+        let listing = &mut ctx.accounts.game_listing;
+        if let Some(t) = title {
+            require!(!t.is_empty(), NovariteError::GameTitleEmpty);
+            require!(t.len() <= 80, NovariteError::GameTitleTooLong);
+            listing.title = t;
+        }
+        if let Some(uri) = metadata_uri {
+            require!(uri.len() <= 200, NovariteError::MetadataUriTooLong);
+            listing.metadata_uri = uri;
+        }
+        if let Some(price) = price_lamports {
+            listing.price_lamports = price;
+        }
+        emit!(GameUpdated {
+            developer: listing.developer,
+            game_slug: listing.game_slug.clone(),
+            title: listing.title.clone(),
+            metadata_uri: listing.metadata_uri.clone(),
+            price_lamports: listing.price_lamports,
+        });
+        Ok(())
+    }
+
+    pub fn transfer_platform_authority(
+        ctx: Context<TransferPlatformAuthority>,
+        new_authority: Pubkey,
+    ) -> Result<()> {
+        let old_authority = ctx.accounts.authority.key();
+        ctx.accounts.platform_config.authority = new_authority;
+        emit!(PlatformAuthorityTransferred {
+            old_authority,
+            new_authority,
+        });
         Ok(())
     }
 }
@@ -225,9 +309,24 @@ pub struct BuyAccessPass<'info> {
 
     pub game_listing: Account<'info, GameListing>,
 
-    /// CHECK: receives lamport payment, validated by being the developer's wallet
-    #[account(mut)]
-    pub developer_wallet: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        constraint = developer_wallet.key() == game_listing.developer @ NovariteError::InvalidDeveloperWallet
+    )]
+    pub developer_wallet: SystemAccount<'info>,
+
+    #[account(
+        seeds = [b"platform"],
+        bump = platform_config.bump,
+    )]
+    pub platform_config: Account<'info, PlatformConfig>,
+
+    /// CHECK: receives platform fee, validated by platform_config.authority constraint
+    #[account(
+        mut,
+        constraint = platform_authority.key() == platform_config.authority
+    )]
+    pub platform_authority: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub player: Signer<'info>,
@@ -249,10 +348,53 @@ pub struct ClaimReward<'info> {
 
     pub game_listing: Account<'info, GameListing>,
 
+    #[account(
+        seeds = [b"access", game_listing.key().as_ref(), player.key().as_ref()],
+        bump = access_pass.bump,
+        constraint = access_pass.player == player.key() @ NovariteError::AccessPassRequired,
+        constraint = access_pass.game == game_listing.key() @ NovariteError::AccessPassRequired,
+    )]
+    pub access_pass: Account<'info, AccessPass>,
+
     #[account(mut)]
     pub player: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct UpdateGame<'info> {
+    #[account(
+        mut,
+        seeds = [b"game", developer_profile.key().as_ref(), game_listing.game_slug.as_bytes()],
+        bump = game_listing.bump,
+        constraint = game_listing.developer == developer_profile.key(),
+    )]
+    pub game_listing: Account<'info, GameListing>,
+
+    #[account(
+        mut,
+        seeds = [b"developer", authority.key().as_ref()],
+        bump = developer_profile.bump,
+        has_one = authority,
+    )]
+    pub developer_profile: Account<'info, DeveloperProfile>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct TransferPlatformAuthority<'info> {
+    #[account(
+        mut,
+        seeds = [b"platform"],
+        bump = platform_config.bump,
+        has_one = authority,
+    )]
+    pub platform_config: Account<'info, PlatformConfig>,
+
+    pub authority: Signer<'info>,
 }
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
@@ -279,4 +421,60 @@ pub enum NovariteError {
     EmptyRewardId,
     #[msg("Reward ID must be 40 characters or fewer")]
     RewardIdTooLong,
+    #[msg("Developer wallet does not match game listing")]
+    InvalidDeveloperWallet,
+    #[msg("Player does not own an access pass for this game")]
+    AccessPassRequired,
+    #[msg("Game title cannot be empty")]
+    GameTitleEmpty,
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+#[event]
+pub struct PlatformInitialized {
+    pub authority: Pubkey,
+    pub platform_fee_bps: u16,
+}
+
+#[event]
+pub struct DeveloperRegistered {
+    pub authority: Pubkey,
+    pub studio_name: String,
+}
+
+#[event]
+pub struct GamePublished {
+    pub developer: Pubkey,
+    pub game_slug: String,
+    pub price_lamports: u64,
+}
+
+#[event]
+pub struct AccessPassPurchased {
+    pub game: Pubkey,
+    pub player: Pubkey,
+    pub price_lamports: u64,
+}
+
+#[event]
+pub struct RewardClaimed {
+    pub game: Pubkey,
+    pub player: Pubkey,
+    pub reward_id: String,
+}
+
+#[event]
+pub struct GameUpdated {
+    pub developer: Pubkey,
+    pub game_slug: String,
+    pub title: String,
+    pub metadata_uri: String,
+    pub price_lamports: u64,
+}
+
+#[event]
+pub struct PlatformAuthorityTransferred {
+    pub old_authority: Pubkey,
+    pub new_authority: Pubkey,
 }

@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 export default function Header() {
-  const [connected, setConnected] = useState(false);
-
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
       {/* Ambient fade — no hard border, the background bleeds into the page */}
@@ -56,21 +54,7 @@ export default function Header() {
         </nav>
 
         {/* ── Wallet button ── */}
-        <button
-          onClick={() => setConnected((p) => !p)}
-          className={`hidden items-center gap-2 rounded border px-5 py-2 font-sans text-sm font-medium tracking-wide transition-all duration-300 md:flex ${
-            connected
-              ? "border-nr-gold/40 text-nr-gold shadow-glow-gold"
-              : "border-nr-edge bg-nr-abyss text-nr-dust hover:border-nr-crimson/50 hover:text-nr-bone hover:shadow-glow-red"
-          }`}
-        >
-          <span
-            className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
-              connected ? "bg-nr-gold" : "bg-nr-smoke"
-            }`}
-          />
-          {connected ? "8xKp…3fQr" : "Connect Wallet"}
-        </button>
+        <WalletMultiButton className="hidden md:flex" />
       </div>
     </header>
   );

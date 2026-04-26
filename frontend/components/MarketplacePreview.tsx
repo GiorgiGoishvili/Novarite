@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { mockGames, type MockGame } from "@/lib/mockGames";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { fetchAllGames } from "@/lib/novariteClient";
 
 const GENRES = ["All", "Dark RPG", "Tactical FPS", "Adventure", "Strategy", "Puzzle", "Survival Horror"];
 
@@ -14,6 +17,20 @@ const item = {
   hidden: { opacity: 0, y: 18 },
   show:   { opacity: 1, y: 0, transition: { duration: 0.48, ease: [0.21, 0.47, 0.32, 0.98] } },
 };
+
+function SkeletonCard() {
+  return (
+    <div className="flex flex-col overflow-hidden rounded bg-nr-abyss animate-pulse">
+      <div className="h-44 w-full bg-nr-deep" />
+      <div className="flex flex-col gap-3 p-5">
+        <div className="h-4 w-3/4 rounded bg-nr-deep" />
+        <div className="h-3 w-1/2 rounded bg-nr-deep" />
+        <div className="h-16 rounded bg-nr-deep" />
+        <div className="h-8 rounded bg-nr-deep" />
+      </div>
+    </div>
+  );
+}
 
 function GameCard({ game }: { game: MockGame }) {
   const [purchased, setPurchased] = useState(false);
@@ -97,11 +114,35 @@ function GameCard({ game }: { game: MockGame }) {
 
 export default function MarketplacePreview() {
   const [activeGenre, setActiveGenre] = useState("All");
+  const [games, setGames] = useState<MockGame[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { connection } = useConnection();
+
+  useEffect(() => {
+    const programIdEnv = process.env.NEXT_PUBLIC_PROGRAM_ID;
+    if (!programIdEnv) {
+      setGames(mockGames);
+      setLoading(false);
+      return;
+    }
+    const programId = new PublicKey(programIdEnv);
+
+    fetchAllGames(connection, programId)
+      .then((fetched) => {
+        setGames(fetched.length > 0 ? fetched : mockGames);
+      })
+      .catch(() => {
+        setGames(mockGames);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [connection]);
 
   const displayed =
     activeGenre === "All"
-      ? mockGames
-      : mockGames.filter((g) => g.genre === activeGenre);
+      ? games
+      : games.filter((g) => g.genre === activeGenre);
 
   return (
     <section className="bg-nr-void py-28">
@@ -127,7 +168,7 @@ export default function MarketplacePreview() {
             </p>
           </div>
           <span className="font-mono text-xs text-nr-smoke">
-            {mockGames.length} games · localnet preview
+            {games.length} games · localnet preview
           </span>
         </motion.div>
 
@@ -155,17 +196,25 @@ export default function MarketplacePreview() {
         </motion.div>
 
         {/* Grid */}
-        <motion.div
-          variants={container}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-60px" }}
-          className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {displayed.map((game) => (
-            <GameCard key={game.id} game={game} />
-          ))}
-        </motion.div>
+        {loading ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : (
+          <motion.div
+            variants={container}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-60px" }}
+            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {displayed.map((game) => (
+              <GameCard key={game.id} game={game} />
+            ))}
+          </motion.div>
+        )}
       </div>
     </section>
   );

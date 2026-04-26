@@ -8,6 +8,9 @@ skip-lint = false
 [programs.localnet]
 novarite = "53HE6Bd8xUv55nGbCYGuRtZEvYQNNGioZAGyr9jTEGEe"
 
+[programs.devnet]
+novarite = "53HE6Bd8xUv55nGbCYGuRtZEvYQNNGioZAGyr9jTEGEe"
+
 [registry]
 url = "https://api.apr.dev"
 
