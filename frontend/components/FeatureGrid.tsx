@@ -2,111 +2,146 @@
 
 import { motion } from "framer-motion";
 
-const features = [
+const ENGINES = [
   {
-    numeral: "I",
-    title: "Publish Without Permission",
-    description:
-      "Register your studio on-chain and list any game in seconds. No approval process, no gatekeepers, no revenue share.",
+    icon: "🌐",
+    name: "HTML5 / Browser",
+    description: "Runs instantly in any browser. Zero download required — share a link and players can start immediately.",
+    color: "bg-blue-50 border-blue-100",
+    iconBg: "bg-blue-100",
   },
   {
-    numeral: "II",
-    title: "Access Passes as PDA Assets",
-    description:
-      "Every purchase creates an AccessPass PDA directly in the player's wallet. Verifiable, transferable, truly owned.",
+    icon: "🔵",
+    name: "Godot",
+    description: "Export to HTML5, Windows, Mac, or Linux. Fully open source and indie-developer friendly.",
+    color: "bg-indigo-50 border-indigo-100",
+    iconBg: "bg-indigo-100",
   },
   {
-    numeral: "III",
-    title: "Reward Early Believers",
-    description:
-      "Issue on-chain rewards to your first supporters before launch. Turn early players into a community with real stakes.",
+    icon: "⚙️",
+    name: "Unity",
+    description: "Upload WebGL builds for browser play or package Windows, Mac, and Linux downloads.",
+    color: "bg-gray-50 border-gray-200",
+    iconBg: "bg-gray-100",
   },
   {
-    numeral: "IV",
-    title: "Transparent Creator Revenue",
-    description:
-      "Track every sale, pass, and reward claim from on-chain data. Your analytics — nothing hidden, nothing estimated.",
+    icon: "🎮",
+    name: "Unreal Engine",
+    description: "Share high-fidelity experiences as packaged downloads. HTML5 export support for web builds.",
+    color: "bg-slate-50 border-slate-100",
+    iconBg: "bg-slate-100",
   },
   {
-    numeral: "V",
-    title: "Build on Open Ownership",
-    description:
-      "Access passes are composable primitives. Gate content, build perks, or let other developers build on top of them.",
+    icon: "👾",
+    name: "GameMaker",
+    description: "Perfect for 2D indie games and jam projects. Upload HTML5 exports for instant browser play.",
+    color: "bg-green-50 border-green-100",
+    iconBg: "bg-green-100",
   },
   {
-    numeral: "VI",
-    title: "Token Economies",
-    description:
-      "Full SPL token minting for in-game currencies, rare drops, and reward tokens. Launching in the next release.",
-    soon: true,
+    icon: "🟡",
+    name: "Construct",
+    description: "Export HTML5 directly and publish in minutes. Great for event-based 2D games.",
+    color: "bg-yellow-50 border-yellow-100",
+    iconBg: "bg-yellow-100",
+  },
+  {
+    icon: "📖",
+    name: "Ren'Py",
+    description: "Visual novels and interactive stories. Package your project and let readers discover it.",
+    color: "bg-pink-50 border-pink-100",
+    iconBg: "bg-pink-100",
+  },
+  {
+    icon: "📦",
+    name: "ZIP / EXE / Any Engine",
+    description: "Custom engine, proprietary tools, anything else — upload a ZIP or EXE and players can download it.",
+    color: "bg-orange-50 border-orange-100",
+    iconBg: "bg-orange-100",
   },
 ];
 
 const container = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+  show: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } },
 };
 
 const item = {
-  hidden: { opacity: 0, y: 20 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.21, 0.47, 0.32, 0.98] } },
+  hidden: { opacity: 0, y: 16 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.42, ease: [0.21, 0.47, 0.32, 0.98] } },
 };
 
 export default function FeatureGrid() {
   return (
-    <section className="bg-nr-abyss py-28">
-      <div className="mx-auto max-w-7xl px-6">
+    <section className="bg-nr-surface py-20 md:py-28">
+      <div className="mx-auto max-w-7xl px-5">
 
         {/* Section header */}
         <motion.div
-          initial={{ opacity: 0, y: 18 }}
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.55, ease: [0.21, 0.47, 0.32, 0.98] }}
-          className="mb-16 max-w-xl"
+          transition={{ duration: 0.5, ease: [0.21, 0.47, 0.32, 0.98] }}
+          className="mb-12 text-center"
         >
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.2em] text-nr-gold/70">
-            The Platform
+          <p className="mb-2 font-sans text-xs font-semibold uppercase tracking-widest text-nr-red">
+            Any engine. Any platform.
           </p>
-          <h2 className="font-display text-4xl font-bold leading-tight tracking-wide text-nr-bone">
-            Everything an Indie Game Needs to Launch and Grow
+          <h2 className="font-sans text-3xl font-extrabold tracking-tight text-nr-ink md:text-4xl">
+            Publish games built with your favourite tools
           </h2>
+          <p className="mx-auto mt-3 max-w-xl font-sans text-base text-nr-muted">
+            Whether you export HTML5, package a ZIP, or ship a WebGL build — Novarite supports it. If
+            it runs, you can share it.
+          </p>
         </motion.div>
 
-        {/* Feature grid */}
+        {/* Engine grid */}
         <motion.div
           variants={container}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-60px" }}
-          className="grid gap-px border border-nr-rim bg-nr-rim md:grid-cols-2 lg:grid-cols-3"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
         >
-          {features.map((f) => (
+          {ENGINES.map((engine) => (
             <motion.div
-              key={f.numeral}
+              key={engine.name}
               variants={item}
-              className="group relative bg-nr-abyss p-8 transition-colors duration-300 hover:bg-nr-deep"
+              className={`card-hover flex flex-col gap-3 rounded-xl border bg-white p-5 ${engine.color}`}
             >
-              {f.soon && (
-                <span className="absolute right-5 top-5 rounded border border-nr-edge px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-nr-smoke">
-                  Soon
-                </span>
-              )}
-              {/* Roman numeral */}
-              <div className="mb-5 font-display text-sm font-semibold tracking-widest text-nr-gold/60 transition-colors duration-300 group-hover:text-nr-gold/80">
-                {f.numeral}
+              <div className={`flex h-10 w-10 items-center justify-center rounded-lg text-xl ${engine.iconBg}`}>
+                {engine.icon}
               </div>
-              <h3 className="mb-3 font-display text-lg font-semibold leading-snug tracking-wide text-nr-bone">
-                {f.title}
-              </h3>
-              <p className="font-sans text-sm leading-relaxed text-nr-dust">
-                {f.description}
-              </p>
-              {/* Bottom accent line on hover */}
-              <div className="absolute bottom-0 left-8 right-8 h-px scale-x-0 bg-gradient-to-r from-nr-gold/0 via-nr-gold/40 to-nr-gold/0 transition-transform duration-500 group-hover:scale-x-100" />
+              <div>
+                <h3 className="font-sans text-sm font-semibold text-nr-ink">
+                  {engine.name}
+                </h3>
+                <p className="mt-1 font-sans text-xs leading-relaxed text-nr-muted">
+                  {engine.description}
+                </p>
+              </div>
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Bottom CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.45, delay: 0.2, ease: [0.21, 0.47, 0.32, 0.98] }}
+          className="mt-12 text-center"
+        >
+          <p className="font-sans text-sm text-nr-muted">
+            Don&apos;t see your engine?{" "}
+            <a href="#" className="font-semibold text-nr-red underline underline-offset-2 hover:text-nr-redhover transition-colors">
+              Request support
+            </a>{" "}
+            or just upload a ZIP — it always works.
+          </p>
+        </motion.div>
+
       </div>
     </section>
   );

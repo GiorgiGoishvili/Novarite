@@ -10,65 +10,61 @@ const config: Config = {
     extend: {
       colors: {
         nr: {
-          // Backgrounds — darkest to elevated
-          void:   "#0d0c0f",
-          abyss:  "#131118",
-          deep:   "#181520",
-          pit:    "#1e1b28",
+          // Backgrounds
+          bg:           "#FFFFFF",
+          surface:      "#F9FAFB",
+          panel:        "#F3F4F6",
           // Borders
-          rim:    "#26223a",
-          edge:   "#342f47",
-          seam:   "#463f5c",
+          border:       "#E5E7EB",
+          ring:         "#D1D5DB",
           // Text
-          bone:   "#e4ddd0",
-          dust:   "#9f9299",
-          smoke:  "#5a5068",
-          // Crimson accent
-          crimson:"#b83232",
-          ember:  "#d44848",
-          blood:  "#821e1e",
-          // Gold accent
-          gold:   "#c09530",
-          shine:  "#e8b848",
-          brass:  "#7a5c1e",
+          ink:          "#111827",
+          body:         "#374151",
+          muted:        "#6B7280",
+          faint:        "#9CA3AF",
+          placeholder:  "#D1D5DB",
+          // Novarite Red accent
+          red:          "#DC2626",
+          redhover:     "#B91C1C",
+          redlight:     "#FEF2F2",
+          redborder:    "#FECACA",
+          // Web3 / Solana accent (secondary — used sparingly)
+          indigo:       "#6366F1",
+          indigobg:     "#EEF2FF",
+          indigoborder: "#C7D2FE",
+          indigomuted:  "#818CF8",
         },
       },
       fontFamily: {
-        display: ["var(--font-cinzel)", "Georgia", "serif"],
-        sans:    ["var(--font-inter)",  "system-ui", "sans-serif"],
-        mono:    ["var(--font-mono)",   "'Courier New'", "monospace"],
+        display: ["var(--font-inter)", "system-ui", "sans-serif"],
+        sans:    ["var(--font-inter)", "system-ui", "sans-serif"],
+        mono:    ["var(--font-mono)", "'Courier New'", "monospace"],
       },
       boxShadow: {
-        "glow-red":   "0 0 28px rgba(184, 50, 50, 0.22)",
-        "glow-gold":  "0 0 28px rgba(192, 149, 48, 0.18)",
-        "card":       "0 4px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
-        "lift":       "0 10px 44px rgba(0,0,0,0.75), 0 0 20px rgba(192, 149, 48, 0.06)",
-        "inset-top":  "inset 0 1px 0 rgba(255,255,255,0.06)",
-      },
-      backgroundImage: {
-        "dot-grid": "radial-gradient(rgba(255,255,255,0.07) 1px, transparent 1px)",
-      },
-      backgroundSize: {
-        "dots": "28px 28px",
+        card:       "0 1px 3px 0 rgba(0,0,0,0.08), 0 1px 2px -1px rgba(0,0,0,0.06)",
+        "card-md":  "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.05)",
+        "card-lg":  "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.04)",
+        "red-ring": "0 0 0 3px rgba(220,38,38,0.15)",
+        header:     "0 1px 0 0 #E5E7EB",
       },
       keyframes: {
-        "cta-glow": {
-          "0%, 100%": { boxShadow: "0 0 16px rgba(184,50,50,0.25)" },
-          "50%":      { boxShadow: "0 0 32px rgba(184,50,50,0.45)" },
+        "fade-up": {
+          "0%":   { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
-        "float": {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%":      { transform: "translateY(-8px)" },
+        "fade-in": {
+          "0%":   { opacity: "0" },
+          "100%": { opacity: "1" },
         },
-        "shimmer": {
-          "0%":   { backgroundPosition: "200% center" },
-          "100%": { backgroundPosition: "-200% center" },
+        "pulse-red": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(220,38,38,0.20)" },
+          "50%":       { boxShadow: "0 0 0 8px rgba(220,38,38,0)" },
         },
       },
       animation: {
-        "cta-glow": "cta-glow 3s ease-in-out infinite",
-        "float":    "float 7s ease-in-out infinite",
-        "shimmer":  "shimmer 4s linear infinite",
+        "fade-up":    "fade-up 0.5s ease-out",
+        "fade-in":    "fade-in 0.4s ease-out",
+        "pulse-red":  "pulse-red 2.5s ease-in-out infinite",
       },
     },
   },

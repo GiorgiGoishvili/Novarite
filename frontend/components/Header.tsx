@@ -1,61 +1,161 @@
 "use client";
 
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useState } from "react";
+import { useAuth } from "./AuthProvider";
 
 export default function Header() {
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50">
-      {/* Ambient fade — no hard border, the background bleeds into the page */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-nr-void via-nr-void/80 to-transparent"
-        aria-hidden="true"
-      />
+  const { user, isLoading, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-      <div className="relative mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-        {/* ── Logo ── */}
-        <a href="/" className="group flex items-center gap-3">
-          {/* Diamond logo mark */}
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 22 22"
-            fill="none"
-            className="transition-opacity group-hover:opacity-75"
-          >
-            <polygon
-              points="11,1 21,8 21,14 11,21 1,14 1,8"
-              stroke="#c09530"
-              strokeWidth="1.2"
-              fill="rgba(192,149,48,0.08)"
-            />
-            <polygon
-              points="11,5 17,9 17,13 11,17 5,13 5,9"
-              stroke="#c09530"
-              strokeWidth="0.6"
-              fill="rgba(192,149,48,0.05)"
-            />
+  return (
+    <header className="sticky top-0 z-50 bg-white border-b border-nr-border">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 h-14">
+
+        {/* Logo */}
+        <a href="/" className="flex items-center gap-2 shrink-0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="11" stroke="#DC2626" strokeWidth="1.5" fill="none" />
+            <polygon points="12,5 18,9.5 18,14.5 12,19 6,14.5 6,9.5" fill="#DC2626" opacity="0.12" />
+            <polygon points="12,8 16,10.5 16,13.5 12,16 8,13.5 8,10.5" fill="#DC2626" opacity="0.9" />
           </svg>
-          <span className="font-display text-base font-semibold tracking-[0.18em] text-nr-bone uppercase">
-            Novarite
-          </span>
+          <span className="font-sans text-base font-bold tracking-tight text-nr-ink">Novarite</span>
         </a>
 
-        {/* ── Navigation ── */}
-        <nav className="hidden items-center gap-8 md:flex">
-          {["Games", "Developers", "Rewards", "Docs"].map((item) => (
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-1">
+          <a
+            href="/#games"
+            className="rounded-md px-3 py-1.5 font-sans text-sm font-medium text-nr-muted transition-colors duration-150 hover:bg-nr-panel hover:text-nr-ink"
+          >
+            Browse
+          </a>
+          <a
+            href="/upload"
+            className="mx-1 rounded-md bg-nr-red px-3.5 py-1.5 font-sans text-sm font-semibold text-white transition-colors duration-150 hover:bg-nr-redhover"
+          >
+            Upload Game
+          </a>
+          {/* Dev Dashboard only appears once auth is confirmed */}
+          {!isLoading && user && (
             <a
-              key={item}
-              href="#"
-              className="font-sans text-sm font-medium tracking-wide text-nr-dust transition-colors duration-200 hover:text-nr-bone"
+              href="/#dashboard"
+              className="rounded-md px-3 py-1.5 font-sans text-sm font-medium text-nr-muted transition-colors duration-150 hover:bg-nr-panel hover:text-nr-ink"
             >
-              {item}
+              Dev Dashboard
             </a>
-          ))}
+          )}
         </nav>
 
-        {/* ── Wallet button ── */}
-        <WalletMultiButton className="hidden md:flex" />
+        {/* Right: auth controls — hidden while auth state is loading to prevent flicker */}
+        <div className="hidden md:flex items-center gap-2 min-w-[160px] justify-end">
+          {isLoading ? (
+            /* Invisible placeholder so layout doesn't shift */
+            <span className="h-8 w-32 rounded-md bg-transparent" aria-hidden="true" />
+          ) : user ? (
+            <>
+              <a
+                href="/profile"
+                className="rounded-md px-3 py-1.5 font-sans text-sm font-medium text-nr-muted transition-colors hover:bg-nr-panel hover:text-nr-ink"
+              >
+                {user.username}
+              </a>
+              <button
+                onClick={logout}
+                className="rounded-md border border-nr-border px-3 py-1.5 font-sans text-sm font-medium text-nr-muted transition-colors hover:bg-nr-panel hover:text-nr-ink"
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <a
+                href="/login"
+                className="rounded-md px-3 py-1.5 font-sans text-sm font-medium text-nr-muted transition-colors hover:bg-nr-panel hover:text-nr-ink"
+              >
+                Sign in
+              </a>
+              <a
+                href="/register"
+                className="rounded-md border border-nr-border px-3 py-1.5 font-sans text-sm font-semibold text-nr-ink transition-colors hover:bg-nr-panel"
+              >
+                Create account
+              </a>
+            </>
+          )}
+        </div>
+
+        {/* Mobile menu toggle */}
+        <button
+          className="md:hidden rounded-md p-2 text-nr-muted hover:bg-nr-panel hover:text-nr-ink"
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label="Toggle menu"
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            {mobileOpen ? (
+              <path fillRule="evenodd" clipRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" />
+            ) : (
+              <path fillRule="evenodd" clipRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
+            )}
+          </svg>
+        </button>
       </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-nr-border bg-white px-5 py-4 flex flex-col gap-1">
+          <a
+            href="/#games"
+            onClick={() => setMobileOpen(false)}
+            className="rounded-md px-3 py-2 font-sans text-sm font-medium text-nr-body hover:bg-nr-panel"
+          >
+            Browse
+          </a>
+          <a
+            href="/upload"
+            onClick={() => setMobileOpen(false)}
+            className="rounded-md px-3 py-2 font-sans text-sm font-medium bg-nr-red text-white hover:bg-nr-redhover"
+          >
+            Upload Game
+          </a>
+          {!isLoading && user && (
+            <a
+              href="/#dashboard"
+              onClick={() => setMobileOpen(false)}
+              className="rounded-md px-3 py-2 font-sans text-sm font-medium text-nr-body hover:bg-nr-panel"
+            >
+              Dev Dashboard
+            </a>
+          )}
+          <div className="mt-3 flex flex-col gap-2 border-t border-nr-border pt-3">
+            {isLoading ? null : user ? (
+              <>
+                <a
+                  href="/profile"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-md px-3 py-2 font-sans text-sm text-nr-body hover:bg-nr-panel"
+                >
+                  {user.username}
+                </a>
+                <button
+                  onClick={() => { logout(); setMobileOpen(false); }}
+                  className="rounded-md border border-nr-border px-3 py-2 text-left font-sans text-sm text-nr-muted hover:bg-nr-panel"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <a href="/login" onClick={() => setMobileOpen(false)} className="rounded-md px-3 py-2 font-sans text-sm text-nr-body hover:bg-nr-panel">
+                  Sign in
+                </a>
+                <a href="/register" onClick={() => setMobileOpen(false)} className="rounded-md border border-nr-border px-3 py-2 font-sans text-sm font-semibold text-nr-ink hover:bg-nr-panel">
+                  Create account
+                </a>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }
