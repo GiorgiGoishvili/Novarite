@@ -6,6 +6,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { fetchAllGames } from "@/lib/novariteClient";
 import { getPublishedGames, type GameListing } from "@/lib/games";
+import { seedDemoGamesIfNeeded } from "@/lib/seedGames";
 import { savePurchase, getPurchaseForGame, type Purchase } from "@/lib/purchases";
 import { useAuth } from "./AuthProvider";
 
@@ -34,6 +35,10 @@ interface BrowsableGame {
   pricing: "free" | "paid-sol";
   priceSol: number;
   externalPlayUrl: string;
+  platform: string;          // "Windows" | "macOS" | "Linux" | "Web / HTML5" | ""
+  downloadUrl: string;       // Direct download URL; empty = no download available
+  fileSizeLabel: string;     // e.g. "45 MB"
+  version: string;           // e.g. "1.0"
   coverColor: string;
   coverEmoji: string;
   source: "local" | "onchain";
@@ -68,6 +73,10 @@ function localToBrowsable(g: GameListing): BrowsableGame {
     pricing:         g.pricing,
     priceSol:        g.priceSol,
     externalPlayUrl: g.externalPlayUrl,
+    platform:        g.platform        ?? "",
+    downloadUrl:     g.downloadUrl     ?? "",
+    fileSizeLabel:   g.fileSizeLabel   ?? "",
+    version:         g.version         ?? "",
     coverColor:      coverColor(g.id),
     coverEmoji:      coverEmoji(g.id),
     source:          "local",
@@ -99,6 +108,56 @@ function explorerTxUrl(sig: string): string {
   return `https://explorer.solana.com/tx/${sig}${cluster}`;
 }
 
+// ─── platform badge styles ────────────────────────────────────────────────────
+
+const PLATFORM_STYLE: Record<string, string> = {
+  "Windows":        "bg-blue-100 text-blue-700",
+  "macOS":          "bg-gray-100 text-gray-700",
+  "Linux":          "bg-orange-100 text-orange-700",
+  "Web / HTML5":    "bg-green-100 text-green-700",
+  "Android":        "bg-emerald-100 text-emerald-700",
+  "Cross-platform": "bg-purple-100 text-purple-700",
+};
+
+// ─── DownloadButton ────────────────────────────────────────────────────────────
+
+function DownloadButton({
+  url,
+  label = "Download",
+  fileSizeLabel,
+}: {
+  url: string;
+  label?: string;
+  fileSizeLabel?: string;
+}) {
+  if (!url) {
+    return (
+      <button
+        disabled
+        className="block w-full rounded-lg border border-nr-border bg-nr-surface py-2 text-center font-sans text-sm text-nr-faint cursor-not-allowed"
+      >
+        Download link coming soon
+      </button>
+    );
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center justify-center gap-2 w-full rounded-lg border border-nr-border bg-white py-2 text-center font-sans text-sm font-semibold text-nr-ink transition-colors hover:bg-nr-surface"
+    >
+      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+      </svg>
+      {label}
+      {fileSizeLabel && (
+        <span className="font-sans text-xs font-normal text-nr-faint">{fileSizeLabel}</span>
+      )}
+    </a>
+  );
+}
+
 function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | null }) {
   const { connected, publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
@@ -125,6 +184,7 @@ function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | nul
       transactionSignature: "",
       network:              SOLANA_NETWORK,
       accessType:           "free",
+      downloadUrl:          game.downloadUrl,
     });
     setPurchase(p);
   }
@@ -162,6 +222,7 @@ function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | nul
         transactionSignature: sig,
         network:              SOLANA_NETWORK,
         accessType:           "paid",
+        downloadUrl:          game.downloadUrl,
       });
       setPurchase(p);
       setStep("idle");
@@ -178,13 +239,21 @@ function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | nul
     }
   }
 
-  // Already owned
+  // Already owned — show download button (or owned badge if no download)
   if (owned) {
     return (
-      <div className="flex flex-col gap-1">
-        <span className="block w-full rounded-lg border border-green-200 bg-green-50 py-2 text-center font-sans text-sm font-semibold text-green-700">
-          ✓ Owned
-        </span>
+      <div className="flex flex-col gap-1.5">
+        {game.downloadUrl || purchase?.downloadUrl ? (
+          <DownloadButton
+            url={game.downloadUrl || purchase?.downloadUrl || ""}
+            label="Download"
+            fileSizeLabel={game.fileSizeLabel}
+          />
+        ) : (
+          <span className="block w-full rounded-lg border border-green-200 bg-green-50 py-2 text-center font-sans text-sm font-semibold text-green-700">
+            ✓ Owned
+          </span>
+        )}
         {purchase?.transactionSignature && (
           <a
             href={explorerTxUrl(purchase.transactionSignature)}
@@ -199,8 +268,29 @@ function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | nul
     );
   }
 
-  // Free game
+  // Free game — show download directly (no sign-in needed if no URL; else prompt)
   if (game.pricing === "free") {
+    if (game.downloadUrl) {
+      return (
+        <DownloadButton
+          url={game.downloadUrl}
+          label="Download free"
+          fileSizeLabel={game.fileSizeLabel}
+        />
+      );
+    }
+    if (game.externalPlayUrl) {
+      return (
+        <a
+          href={game.externalPlayUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="block w-full rounded-lg bg-nr-red py-2 text-center font-sans text-sm font-semibold text-white transition-colors hover:bg-nr-redhover"
+        >
+          Play in browser
+        </a>
+      );
+    }
     return (
       <div className="flex flex-col gap-1">
         <button
@@ -286,6 +376,13 @@ function GameCard({ game, userId }: { game: BrowsableGame; userId: string | null
           {game.engine}
         </span>
 
+        {/* Platform badge */}
+        {game.platform && (
+          <span className={`absolute left-3 bottom-3 rounded-full px-2 py-0.5 font-sans text-[10px] font-semibold ${PLATFORM_STYLE[game.platform] ?? "bg-gray-100 text-gray-700"}`}>
+            {game.platform}
+          </span>
+        )}
+
         {game.pricing !== "free" && game.priceSol > 0 && (
           <span className="absolute right-3 top-3 rounded-full bg-nr-ink/80 px-2 py-0.5 font-sans text-[10px] font-semibold text-white backdrop-blur-sm">
             {game.priceSol} SOL
@@ -324,7 +421,12 @@ function GameCard({ game, userId }: { game: BrowsableGame; userId: string | null
               </span>
             )}
           </div>
-          <p className="mt-0.5 font-sans text-xs text-nr-muted">by {game.developer}</p>
+          <p className="mt-0.5 font-sans text-xs text-nr-muted">
+            by {game.developer}
+            {game.version && (
+              <span className="ml-1.5 text-nr-faint">v{game.version}</span>
+            )}
+          </p>
         </div>
 
         {game.tags.length > 0 && (
@@ -359,7 +461,10 @@ export default function MarketplacePreview() {
   const { user } = useAuth();
 
   useEffect(() => {
-    // 1. Load local games immediately (no async)
+    // 1. Seed demo game on first load if library is empty
+    seedDemoGamesIfNeeded();
+
+    // 2. Load local games immediately (no async)
     const localGames = getPublishedGames().map(localToBrowsable);
     setAllGames(localGames);
 
@@ -386,6 +491,10 @@ export default function MarketplacePreview() {
             pricing:         (g.price > 0 ? "paid-sol" : "free") as "free" | "paid-sol",
             priceSol:        g.price,
             externalPlayUrl: "",
+            platform:        "",
+            downloadUrl:     "",
+            fileSizeLabel:   "",
+            version:         "",
             coverColor:      g.coverColor,
             coverEmoji:      g.coverEmoji,
             source:          "onchain" as const,

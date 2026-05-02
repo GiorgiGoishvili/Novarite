@@ -40,11 +40,21 @@ const GENRES = [
   "Sports", "Educational", "Other",
 ];
 
+const PLATFORMS = [
+  "Windows",
+  "macOS",
+  "Linux",
+  "Web / HTML5",
+  "Android",
+  "Cross-platform",
+];
+
 interface Errors {
   title?: string;
   shortDesc?: string;
   gameStatus?: string;
   engine?: string;
+  downloadUrl?: string;
   priceSol?: string;
   payoutWallet?: string;
 }
@@ -60,21 +70,25 @@ export default function UploadPage() {
   const router = useRouter();
 
   // Form fields
-  const [title,          setTitle]          = useState("");
-  const [shortDesc,      setShortDesc]      = useState("");
-  const [fullDesc,       setFullDesc]       = useState("");
-  const [gameStatus,     setGameStatus]     = useState("");
-  const [engine,         setEngine]         = useState("");
-  const [genre,          setGenre]          = useState("");
-  const [tags,           setTags]           = useState("");
-  const [buildTypes,     setBuildTypes]     = useState<string[]>([]);
-  const [pricing,        setPricing]        = useState<"free" | "paid-sol">("free");
-  const [priceSol,       setPriceSol]       = useState("");
-  const [payoutWallet,   setPayoutWallet]   = useState("");
-  const [trailerUrl,     setTrailerUrl]     = useState("");
+  const [title,           setTitle]           = useState("");
+  const [shortDesc,       setShortDesc]       = useState("");
+  const [fullDesc,        setFullDesc]        = useState("");
+  const [gameStatus,      setGameStatus]      = useState("");
+  const [engine,          setEngine]          = useState("");
+  const [genre,           setGenre]           = useState("");
+  const [tags,            setTags]            = useState("");
+  const [buildTypes,      setBuildTypes]      = useState<string[]>([]);
+  const [platform,        setPlatform]        = useState("");
+  const [downloadUrl,     setDownloadUrl]     = useState("");
+  const [fileSizeLabel,   setFileSizeLabel]   = useState("");
+  const [version,         setVersion]         = useState("");
+  const [pricing,         setPricing]         = useState<"free" | "paid-sol">("free");
+  const [priceSol,        setPriceSol]        = useState("");
+  const [payoutWallet,    setPayoutWallet]    = useState("");
+  const [trailerUrl,      setTrailerUrl]      = useState("");
   const [externalPlayUrl, setExternalPlayUrl] = useState("");
-  const [errors,         setErrors]         = useState<Errors>({});
-  const [publishedGame,  setPublishedGame]  = useState<GameListing | null>(null);
+  const [errors,          setErrors]          = useState<Errors>({});
+  const [publishedGame,   setPublishedGame]   = useState<GameListing | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -101,12 +115,19 @@ export default function UploadPage() {
     );
   }
 
+  // Non-web platforms require a download URL
+  const isNonWeb = platform !== "" && platform !== "Web / HTML5";
+
   function validate(): Errors {
     const e: Errors = {};
-    if (!title.trim())     e.title     = "Game title is required.";
-    if (!shortDesc.trim()) e.shortDesc = "Short description is required.";
+    if (!title.trim())     e.title      = "Game title is required.";
+    if (!shortDesc.trim()) e.shortDesc  = "Short description is required.";
     if (!gameStatus)       e.gameStatus = "Please select a game status.";
-    if (!engine)           e.engine    = "Please select an engine.";
+    if (!engine)           e.engine     = "Please select an engine.";
+    if (isNonWeb && !downloadUrl.trim())
+      e.downloadUrl = "A download URL is required for non-web games.";
+    if (downloadUrl.trim() && !/^https?:\/\/.+/.test(downloadUrl.trim()))
+      e.downloadUrl = "Download URL must start with http:// or https://";
     if (pricing === "paid-sol") {
       const p = parseFloat(priceSol);
       if (isNaN(p) || p <= 0) e.priceSol = "Price must be greater than 0.";
@@ -136,6 +157,10 @@ export default function UploadPage() {
       tags:              tagList,
       gameStatus:        gameStatus as GameListing["gameStatus"],
       buildTypes,
+      platform,
+      downloadUrl:       downloadUrl.trim(),
+      fileSizeLabel:     fileSizeLabel.trim(),
+      version:           version.trim(),
       pricing,
       priceSol:          pricing === "paid-sol" ? parseFloat(priceSol) : 0,
       developerWallet:   pricing === "paid-sol" ? payoutWallet.trim() : "",
@@ -435,7 +460,82 @@ export default function UploadPage() {
 
                 <div className="rounded-lg border border-nr-border bg-nr-surface p-4 font-sans text-xs text-nr-muted">
                   Cover image and file uploads require a backend storage provider (e.g. S3, Cloudflare R2).
-                  Coming soon — for now, add an external link above.
+                  Coming soon — for now, add a download URL below.
+                </div>
+              </div>
+            </fieldset>
+
+            {/* ── Download / Platform ──────────────────────────────────────── */}
+            <fieldset className="rounded-xl border border-nr-border bg-white p-6 shadow-card">
+              <legend className="px-1 font-sans text-sm font-semibold text-nr-ink">
+                Download &amp; platform
+              </legend>
+              <div className="mt-4 flex flex-col gap-5">
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block font-sans text-xs font-semibold uppercase tracking-wide text-nr-muted mb-1.5">
+                      Primary platform
+                    </label>
+                    <select
+                      value={platform}
+                      onChange={(e) => setPlatform(e.target.value)}
+                      className={inputCls()}
+                    >
+                      <option value="">Select platform…</option>
+                      {PLATFORMS.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 font-sans text-xs text-nr-faint">
+                      Shown as a badge on the game card.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block font-sans text-xs font-semibold uppercase tracking-wide text-nr-muted mb-1.5">
+                      Version
+                    </label>
+                    <input
+                      type="text"
+                      value={version}
+                      onChange={(e) => setVersion(e.target.value)}
+                      placeholder="1.0"
+                      className={inputCls()}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-sans text-xs font-semibold uppercase tracking-wide text-nr-muted mb-1.5">
+                    Download URL {isNonWeb && <span className="text-nr-red">*</span>}
+                  </label>
+                  <input
+                    type="url"
+                    value={downloadUrl}
+                    onChange={(e) => { setDownloadUrl(e.target.value); setErrors((p) => ({ ...p, downloadUrl: undefined })); }}
+                    placeholder="https://drive.google.com/uc?export=download&id=…"
+                    className={inputCls(errors.downloadUrl)}
+                  />
+                  <FieldError msg={errors.downloadUrl} />
+                  <div className="mt-1.5 rounded-lg border border-nr-indigoborder bg-nr-indigobg px-3 py-2 font-sans text-xs text-nr-indigo">
+                    <strong>Google Drive:</strong> Upload your file → Share → &quot;Anyone with the link&quot; → copy link.
+                    Then change <code className="font-mono bg-white/60 px-1 rounded">/file/d/ID/view</code> to{" "}
+                    <code className="font-mono bg-white/60 px-1 rounded">uc?export=download&amp;id=ID</code>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-sans text-xs font-semibold uppercase tracking-wide text-nr-muted mb-1.5">
+                    File size (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={fileSizeLabel}
+                    onChange={(e) => setFileSizeLabel(e.target.value)}
+                    placeholder="e.g. 45 MB"
+                    className={inputCls()}
+                  />
                 </div>
               </div>
             </fieldset>

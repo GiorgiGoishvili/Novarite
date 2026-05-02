@@ -12,6 +12,12 @@ export interface GameListing {
   tags: string[];
   gameStatus: "prototype" | "demo" | "early-access" | "released";
   buildTypes: string[];
+  // Download info
+  platform: string;        // "Windows" | "macOS" | "Linux" | "Web/HTML5" | "Android" | "Cross-platform" | ""
+  downloadUrl: string;     // Public URL to download the game file (Google Drive, Supabase, etc.)
+  fileSizeLabel: string;   // Human-readable size, e.g. "45 MB" (optional, empty = not shown)
+  version: string;         // e.g. "1.0" (optional, empty = not shown)
+  // Pricing
   pricing: "free" | "paid-sol";
   priceSol: number;         // 0 for free games
   developerWallet: string;  // Solana public key — receives payment for paid games

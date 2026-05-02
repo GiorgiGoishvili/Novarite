@@ -5,14 +5,15 @@ export interface Purchase {
   id: string;
   gameId: string;
   gameTitle: string;
-  buyerUserId: string;       // username from auth
-  buyerWallet: string;       // Solana public key (may be empty for free access without wallet)
-  sellerWallet: string;      // developer's Solana public key
-  priceSol: number;          // 0 for free access
+  buyerUserId: string;          // username from auth
+  buyerWallet: string;          // Solana public key (may be empty for free access without wallet)
+  sellerWallet: string;         // developer's Solana public key
+  priceSol: number;             // 0 for free access
   transactionSignature: string; // empty for free access
-  purchasedAt: string;       // ISO 8601
-  network: string;           // "devnet" | "mainnet-beta"
+  purchasedAt: string;          // ISO 8601
+  network: string;              // "devnet" | "mainnet-beta"
   accessType: "free" | "paid";
+  downloadUrl?: string;         // Copied from the game listing at time of access claim
 }
 
 const STORAGE_KEY = "nr_purchases";
