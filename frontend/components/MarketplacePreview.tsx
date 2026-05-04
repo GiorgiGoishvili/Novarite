@@ -57,7 +57,7 @@ interface BrowsableGame {
   version: string;           // e.g. "1.0"
   coverColor: string;
   coverEmoji: string;
-  source: "local" | "onchain";
+  source: "local" | "onchain" | "supabase";
 }
 
 // ─── cover art generators (deterministic from id) ─────────────────────────────
@@ -76,7 +76,7 @@ function coverEmoji(id: string): string {
 
 // ─── converters ───────────────────────────────────────────────────────────────
 
-function localToBrowsable(g: GameListing): BrowsableGame {
+function localToBrowsable(g: GameListing, src: BrowsableGame["source"] = "local"): BrowsableGame {
   return {
     id:              g.id,
     title:           g.title,
@@ -95,7 +95,7 @@ function localToBrowsable(g: GameListing): BrowsableGame {
     version:         g.version         ?? "",
     coverColor:      coverColor(g.id),
     coverEmoji:      coverEmoji(g.id),
-    source:          "local",
+    source:          src,
   };
 }
 
@@ -564,56 +564,77 @@ export default function MarketplacePreview() {
   const { user } = useAuth();
 
   useEffect(() => {
-    // 1. Seed demo game on first load if library is empty
-    seedDemoGamesIfNeeded();
+    let active = true;
 
-    // 2. Load local games immediately (no async)
-    const localGames = getPublishedGames().map(localToBrowsable);
+    // 1. Seed demo game on first load if library is empty, show localStorage games immediately
+    seedDemoGamesIfNeeded();
+    const localGames = getPublishedGames().map((g) => localToBrowsable(g, "local"));
     setAllGames(localGames);
 
-    // 2. If on-chain program ID is configured, merge on-chain games
-    const programIdEnv = process.env.NEXT_PUBLIC_PROGRAM_ID;
-    if (!programIdEnv) {
-      setLoading(false);
-      return;
+    // 2. Fetch from Supabase — source of truth, works across all domains/devices
+    async function fetchFromSupabase() {
+      try {
+        const res = await fetch("/api/games/published");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json() as { games?: GameListing[] };
+        if (!active) return;
+
+        const sbGames   = (data.games ?? []).map((g) => localToBrowsable(g, "supabase"));
+        const sbIds     = new Set(sbGames.map((g) => g.id));
+        // Keep local-only games not yet in Supabase (e.g. upload in progress or seed game)
+        const localOnly = localGames.filter((g) => !sbIds.has(g.id));
+        setAllGames([...sbGames, ...localOnly]);
+      } catch {
+        // Supabase unavailable — local games already shown as fallback
+      } finally {
+        if (active) setLoading(false);
+      }
     }
 
-    try {
-      const programId = new PublicKey(programIdEnv);
-      fetchAllGames(connection, programId)
-        .then((onChain) => {
-          const converted = onChain.map((g) => ({
-            id:              g.id,
-            title:           g.title,
-            developer:       g.developer,
-            developerWallet: "", // on-chain account pubkey ≠ developer wallet; skip for MVP
-            engine:          g.engine,
-            genre:           g.genre,
-            tags:            g.tags,
-            shortDesc:       g.description,
-            pricing:         (g.price > 0 ? "paid-sol" : "free") as "free" | "paid-sol",
-            priceSol:        g.price,
-            externalPlayUrl: "",
-            platform:        "",
-            downloadUrl:     "",
-            fileSizeLabel:   "",
-            version:         "",
-            coverColor:      g.coverColor,
-            coverEmoji:      g.coverEmoji,
-            source:          "onchain" as const,
-          }));
-          setAllGames((prev) => {
-            // Deduplicate by id in case a local game matches on-chain
-            const ids = new Set(prev.map((g) => g.id));
-            return [...prev, ...converted.filter((g) => !ids.has(g.id))];
-          });
-        })
-        .catch(() => { /* on-chain fetch failed — local games still show */ })
-        .finally(() => setLoading(false));
-    } catch {
-      setLoading(false);
+    void fetchFromSupabase();
+
+    // 3. Also merge on-chain games in the background if program ID is configured
+    const programIdEnv = process.env.NEXT_PUBLIC_PROGRAM_ID;
+    if (programIdEnv) {
+      try {
+        const programId = new PublicKey(programIdEnv);
+        fetchAllGames(connection, programId)
+          .then((onChain) => {
+            if (!active) return;
+            const converted: BrowsableGame[] = onChain.map((g) => ({
+              id:              g.id,
+              title:           g.title,
+              developer:       g.developer,
+              developerWallet: "",
+              engine:          g.engine,
+              genre:           g.genre,
+              tags:            g.tags,
+              shortDesc:       g.description,
+              pricing:         (g.price > 0 ? "paid-sol" : "free") as "free" | "paid-sol",
+              priceSol:        g.price,
+              externalPlayUrl: "",
+              platform:        "",
+              downloadUrl:     "",
+              fileSizeLabel:   "",
+              version:         "",
+              coverColor:      g.coverColor,
+              coverEmoji:      g.coverEmoji,
+              source:          "onchain" as const,
+            }));
+            setAllGames((prev) => {
+              const ids = new Set(prev.map((g) => g.id));
+              return [...prev, ...converted.filter((g) => !ids.has(g.id))];
+            });
+          })
+          .catch(() => {});
+      } catch {
+        // programId invalid or on-chain unavailable — Supabase games already shown
+      }
     }
-  }, [connection]);
+
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const availableGenres = useMemo(() => {
     if (allGames.length === 0) return [];

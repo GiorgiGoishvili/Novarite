@@ -10,9 +10,9 @@ import Footer from "@/components/Footer";
 import { saveGame, type GameListing } from "@/lib/games";
 import { isValidPublicKey, SOLANA_NETWORK } from "@/lib/solana";
 
-async function publishGameToSupabase(game: GameListing): Promise<void> {
+async function publishGameToSupabase(game: GameListing): Promise<{ ok: boolean; error?: string }> {
   try {
-    await fetch("/api/games/publish", {
+    const res = await fetch("/api/games/publish", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -39,8 +39,14 @@ async function publishGameToSupabase(game: GameListing): Promise<void> {
         network:            SOLANA_NETWORK,
       }),
     });
-  } catch {
-    // Silent — localStorage write already succeeded
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      return { ok: false, error: body.error ?? `Server error (${res.status})` };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Network error";
+    return { ok: false, error: `Could not reach server: ${msg}` };
   }
 }
 
@@ -123,6 +129,8 @@ export default function UploadPage() {
   const [externalPlayUrl, setExternalPlayUrl] = useState("");
   const [errors,          setErrors]          = useState<Errors>({});
   const [publishedGame,   setPublishedGame]   = useState<GameListing | null>(null);
+  const [isSaving,        setIsSaving]        = useState(false);
+  const [publishError,    setPublishError]    = useState("");
 
   // Auth guard
   useEffect(() => {
@@ -171,11 +179,13 @@ export default function UploadPage() {
     return e;
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setErrors({});
+    setPublishError("");
+    setIsSaving(true);
 
     const tagList = tags
       .split(",")
@@ -204,8 +214,15 @@ export default function UploadPage() {
       visibility:        "published",
     });
 
+    const result = await publishGameToSupabase(game);
+    setIsSaving(false);
+
+    if (!result.ok) {
+      setPublishError(result.error ?? "Failed to save game. Please try again.");
+      return;
+    }
+
     setPublishedGame(game);
-    void publishGameToSupabase(game); // persist to Supabase — non-blocking
   }
 
   // ── Loading / auth guard UI ────────────────────────────────────────────────
@@ -237,7 +254,7 @@ export default function UploadPage() {
               &ldquo;{publishedGame.title}&rdquo; published!
             </h1>
             <p className="mt-3 font-sans text-sm text-nr-muted">
-              Your game has been saved and will appear in Browse.
+              Your game is live and will appear in Browse on all devices.
             </p>
             {publishedGame.pricing === "paid-sol" && (
               <div className="mt-3 rounded-lg border border-nr-indigoborder bg-nr-indigobg px-4 py-3 font-sans text-xs text-nr-indigo text-left">
@@ -250,11 +267,6 @@ export default function UploadPage() {
                 .
               </div>
             )}
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 font-sans text-xs text-amber-800 text-left">
-              <strong>MVP note:</strong> Game listings are stored locally in this browser.
-              They will not appear on other devices or after clearing browser data.
-              A backend database will be added later.
-            </div>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <button
                 onClick={() => setPublishedGame(null)}
@@ -292,14 +304,8 @@ export default function UploadPage() {
               Publish your game
             </h1>
             <p className="mt-2 font-sans text-sm text-nr-muted">
-              Fill in the details below. Published games appear in Browse immediately.
+              Fill in the details below. Published games appear in Browse on all devices immediately.
             </p>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              <span className="font-sans text-xs text-amber-700 font-medium">
-                MVP · Game listings stored locally in this browser
-              </span>
-            </div>
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
@@ -680,18 +686,26 @@ export default function UploadPage() {
             </fieldset>
 
             {/* ── Submit ──────────────────────────────────────────────────── */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-nr-border bg-white p-5 shadow-card">
-              <p className="font-sans text-xs text-nr-muted">
-                By publishing you agree to the Novarite{" "}
-                <a href="#" className="text-nr-red underline underline-offset-2">Terms of Service</a>.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  className="rounded-lg bg-nr-red px-7 py-2.5 font-sans text-sm font-semibold text-white shadow-sm hover:bg-nr-redhover transition-colors"
-                >
-                  Publish game
-                </button>
+            <div className="flex flex-col gap-3 rounded-xl border border-nr-border bg-white p-5 shadow-card">
+              {publishError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 font-sans text-xs text-red-700">
+                  <strong>Could not publish:</strong> {publishError}
+                </div>
+              )}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-sans text-xs text-nr-muted">
+                  By publishing you agree to the Novarite{" "}
+                  <a href="#" className="text-nr-red underline underline-offset-2">Terms of Service</a>.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="rounded-lg bg-nr-red px-7 py-2.5 font-sans text-sm font-semibold text-white shadow-sm hover:bg-nr-redhover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isSaving ? "Saving…" : "Publish game"}
+                  </button>
+                </div>
               </div>
             </div>
 
