@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
 
     const result = await checkPhoneVerification(phone, code);
 
+    if (result.notConfigured) return json({ error: result.error }, 503);
     if (result.ok) return json({ ok: true });
     return json({ error: result.error ?? "Verification failed." }, 400);
   } catch {

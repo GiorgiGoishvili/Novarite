@@ -1,13 +1,3 @@
-/**
- * Twilio Verify integration — server-side only.
- *
- * Uses the official twilio npm package with the Verify Service API.
- * Reads TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID from env.
- *
- * sendPhoneVerification  — triggers a Twilio Verify SMS (Twilio manages the code)
- * checkPhoneVerification — validates the code the user entered against Twilio Verify
- */
-
 import twilio from "twilio";
 
 export interface VerifyResult {
@@ -22,9 +12,9 @@ function getCredentials(): { accountSid: string; authToken: string; serviceSid: 
   const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim();
 
   console.log("[Twilio] Credential check:", {
-    hasAccountSid:       Boolean(accountSid),
-    hasAuthToken:        Boolean(authToken),
-    hasVerifyServiceSid: Boolean(serviceSid),
+    hasTwilioAccountSid:       Boolean(accountSid),
+    hasTwilioAuthToken:        Boolean(authToken),
+    hasTwilioVerifyServiceSid: Boolean(serviceSid),
   });
 
   if (!accountSid || !authToken || !serviceSid) return null;
@@ -45,7 +35,7 @@ function missingError(): VerifyResult {
   return {
     ok:            false,
     notConfigured: true,
-    error:         `Twilio Verify is not configured. Missing: ${missing}.`,
+    error:         `Missing ${missing}`,
   };
 }
 
