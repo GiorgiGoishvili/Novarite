@@ -23,6 +23,22 @@ const item = {
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
+interface OwnedApiResponse {
+  owned: boolean;
+  purchase?: {
+    id:                   string;
+    gameId:               string;
+    gameTitle:            string | null;
+    buyerWallet:          string;
+    transactionSignature: string | null;
+    priceSol:             number | null;
+    network:              string | null;
+    accessType:           string | null;
+    downloadUrl:          string | null;
+    purchasedAt:          string;
+  };
+}
+
 interface BrowsableGame {
   id: string;
   title: string;
@@ -99,6 +115,42 @@ function SkeletonCard() {
   );
 }
 
+// ─── Supabase helpers (fire-and-forget, never block the UI) ──────────────────
+
+async function recordPurchaseToSupabase(params: {
+  gameId:        string;
+  gameTitle:     string;
+  buyerUsername: string | null;
+  buyerWallet:   string;
+  sellerWallet:  string;
+  priceSol:      number;
+  txSignature:   string;
+  network:       string;
+  accessType:    string;
+  downloadUrl:   string;
+}): Promise<void> {
+  try {
+    await fetch("/api/purchases/record", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        local_game_id:         params.gameId,
+        game_title:            params.gameTitle,
+        buyer_username:        params.buyerUsername,
+        buyer_wallet:          params.buyerWallet,
+        seller_wallet:         params.sellerWallet,
+        price_paid_sol:        params.priceSol,
+        transaction_signature: params.txSignature,
+        network:               params.network,
+        access_type:           params.accessType,
+        download_url:          params.downloadUrl,
+      }),
+    });
+  } catch {
+    // Silent — localStorage write already succeeded
+  }
+}
+
 // ─── BuyButton ────────────────────────────────────────────────────────────────
 
 const SOLANA_NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK ?? "devnet";
@@ -165,10 +217,47 @@ function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | nul
   const [error, setError]     = useState("");
   const [purchase, setPurchase] = useState<Purchase | null>(null);
 
-  // Load ownership from localStorage client-side (avoids SSR hydration mismatch)
+  // Ownership check: localStorage first (fast), then Supabase if wallet connected.
+  // Supabase check lets buyers see owned games on any device after reconnecting wallet.
   useEffect(() => {
-    if (userId) setPurchase(getPurchaseForGame(userId, game.id));
-  }, [userId, game.id]);
+    if (!userId) return;
+
+    // Fast path: local device already has the purchase record
+    const local = getPurchaseForGame(userId, game.id);
+    if (local) { setPurchase(local); return; }
+
+    // Slow path: check Supabase by wallet (works across devices)
+    if (!publicKey) return;
+    let active = true;
+    const wallet = publicKey.toBase58();
+
+    fetch(
+      `/api/purchases/owned?gameId=${encodeURIComponent(game.id)}&wallet=${encodeURIComponent(wallet)}`
+    )
+      .then((r) => r.json() as Promise<OwnedApiResponse>)
+      .then((data) => {
+        if (!active || !data.owned || !data.purchase) return;
+        const p = data.purchase;
+        setPurchase({
+          id:                   `sb_${p.id}`,
+          gameId:               game.id,
+          gameTitle:            p.gameTitle ?? game.title,
+          buyerUserId:          userId,
+          buyerWallet:          wallet,
+          sellerWallet:         "",
+          priceSol:             p.priceSol             ?? 0,
+          transactionSignature: p.transactionSignature ?? "",
+          purchasedAt:          p.purchasedAt,
+          network:              p.network              ?? SOLANA_NETWORK,
+          accessType:           (p.accessType          ?? "paid") as "free" | "paid",
+          downloadUrl:          p.downloadUrl          ?? game.downloadUrl,
+        });
+      })
+      .catch(() => { /* silent — localStorage is the fallback */ });
+
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, game.id, publicKey]);
 
   const owned = !!purchase;
 
@@ -226,6 +315,20 @@ function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | nul
       });
       setPurchase(p);
       setStep("idle");
+
+      // Persist to Supabase for cross-device ownership — fire-and-forget
+      void recordPurchaseToSupabase({
+        gameId:        game.id,
+        gameTitle:     game.title,
+        buyerUsername: userId,
+        buyerWallet:   publicKey.toBase58(),
+        sellerWallet:  game.developerWallet,
+        priceSol:      game.priceSol,
+        txSignature:   sig,
+        network:       SOLANA_NETWORK,
+        accessType:    "paid",
+        downloadUrl:   game.downloadUrl,
+      });
     } catch (e) {
       setStep("error");
       const msg = (e as Error)?.message ?? "";

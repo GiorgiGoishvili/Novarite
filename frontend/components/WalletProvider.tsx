@@ -7,7 +7,7 @@ import { useMemo, type ReactNode } from "react";
 
 export default function NovariteWalletProvider({ children }: { children: ReactNode }) {
   const endpoint =
-    process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
+    process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
 
   const wallets = useMemo(
     () => [new PhantomWalletAdapter(), new SolflareWalletAdapter()],

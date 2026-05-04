@@ -8,7 +8,41 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { saveGame, type GameListing } from "@/lib/games";
-import { isValidPublicKey } from "@/lib/solana";
+import { isValidPublicKey, SOLANA_NETWORK } from "@/lib/solana";
+
+async function publishGameToSupabase(game: GameListing): Promise<void> {
+  try {
+    await fetch("/api/games/publish", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        local_game_id:      game.id,
+        title:              game.title,
+        short_desc:         game.shortDesc,
+        description:        game.fullDesc,
+        engine:             game.engine,
+        genre:              game.genre,
+        tags:               game.tags,
+        game_status:        game.gameStatus,
+        build_types:        game.buildTypes,
+        platform:           game.platform,
+        download_url:       game.downloadUrl,
+        file_size_label:    game.fileSizeLabel,
+        game_version:       game.version,
+        pricing:            game.pricing,
+        price_sol:          game.priceSol,
+        developer_wallet:   game.developerWallet,
+        developer_username: game.developerUsername,
+        external_play_url:  game.externalPlayUrl,
+        trailer_url:        game.trailerUrl,
+        is_published:       game.visibility === "published",
+        network:            SOLANA_NETWORK,
+      }),
+    });
+  } catch {
+    // Silent — localStorage write already succeeded
+  }
+}
 
 const ENGINES = [
   "HTML5 / Browser",
@@ -171,6 +205,7 @@ export default function UploadPage() {
     });
 
     setPublishedGame(game);
+    void publishGameToSupabase(game); // persist to Supabase — non-blocking
   }
 
   // ── Loading / auth guard UI ────────────────────────────────────────────────
