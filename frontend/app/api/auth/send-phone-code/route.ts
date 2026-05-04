@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateCode, storeCode } from "@/lib/verificationStore";
-import { sendVerificationSms } from "@/lib/sms";
+import { sendPhoneVerification } from "@/lib/sms";
 
-// Accepts E.164 international format with optional spaces/dashes/parens.
-// Examples: +995555123456, +1 (555) 000-1234, +44 7911 123456
+// E.164 after stripping spaces/dashes/parens
 const PHONE_RE = /^\+[1-9]\d{6,14}$/;
 
 function normalise(phone: string): string {
@@ -20,32 +18,17 @@ export async function POST(request: NextRequest) {
     const raw   = typeof body.phone === "string" ? body.phone.trim() : "";
     const phone = normalise(raw);
 
-    if (!phone)                 return json({ error: "Phone number is required." }, 400);
+    if (!phone) return json({ error: "Phone number is required." }, 400);
     if (!PHONE_RE.test(phone)) {
       return json({
-        error: "Enter a valid international phone number (e.g. +995 555 123456).",
+        error: "Enter a valid international phone number starting with + (e.g. +995 555 123456).",
       }, 400);
     }
 
-    const code = generateCode();
-    storeCode("phone", phone, code);
-
-    if (process.env.NODE_ENV === "development") {
-      console.log(`\n[DEV] SMS verification code for ${phone}: ${code}\n`);
-    }
-
-    const result = await sendVerificationSms(phone, code);
+    const result = await sendPhoneVerification(phone);
 
     if (result.notConfigured) {
-      return json(
-        {
-          error:   result.error,
-          devHint: process.env.NODE_ENV === "development"
-            ? "Code printed to server console — enter it to test the full flow."
-            : undefined,
-        },
-        503
-      );
+      return json({ error: result.error }, 503);
     }
 
     if (!result.ok) {

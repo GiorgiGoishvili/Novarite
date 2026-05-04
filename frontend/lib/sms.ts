@@ -1,65 +1,87 @@
 /**
- * SMS sending utility — server-side only.
+ * Twilio Verify integration — server-side only.
  *
- * Uses the Twilio Messaging REST API directly (no npm package required).
- * Reads TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER from env.
+ * Uses the official twilio npm package with the Verify Service API.
+ * Reads TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID from env.
  *
- * Returns a typed result object; never throws.
- * If credentials are missing, returns { ok: false, notConfigured: true }.
+ * sendPhoneVerification  — triggers a Twilio Verify SMS (Twilio manages the code)
+ * checkPhoneVerification — validates the code the user entered against Twilio Verify
  */
 
-export interface SmsResult {
+import twilio from "twilio";
+
+export interface VerifyResult {
   ok:             boolean;
   notConfigured?: boolean;
   error?:         string;
 }
 
-export async function sendVerificationSms(
-  to:   string,
-  code: string
-): Promise<SmsResult> {
+function getCredentials(): { accountSid: string; authToken: string; serviceSid: string } | null {
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
   const authToken  = process.env.TWILIO_AUTH_TOKEN?.trim();
-  const from       = process.env.TWILIO_PHONE_NUMBER?.trim();
+  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim();
 
-  if (!accountSid || !authToken || !from) {
-    return {
-      ok:            false,
-      notConfigured: true,
-      error:         "SMS service is not configured (Twilio credentials missing).",
-    };
-  }
+  console.log("[Twilio] Credential check:", {
+    hasAccountSid:       Boolean(accountSid),
+    hasAuthToken:        Boolean(authToken),
+    hasVerifyServiceSid: Boolean(serviceSid),
+  });
+
+  if (!accountSid || !authToken || !serviceSid) return null;
+  return { accountSid, authToken, serviceSid };
+}
+
+function missingError(): VerifyResult {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const authToken  = process.env.TWILIO_AUTH_TOKEN?.trim();
+  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID?.trim();
+
+  const missing = [
+    !accountSid ? "TWILIO_ACCOUNT_SID"       : null,
+    !authToken  ? "TWILIO_AUTH_TOKEN"         : null,
+    !serviceSid ? "TWILIO_VERIFY_SERVICE_SID" : null,
+  ].filter(Boolean).join(", ");
+
+  return {
+    ok:            false,
+    notConfigured: true,
+    error:         `Twilio Verify is not configured. Missing: ${missing}.`,
+  };
+}
+
+export async function sendPhoneVerification(to: string): Promise<VerifyResult> {
+  const creds = getCredentials();
+  if (!creds) return missingError();
 
   try {
-    const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-
-    const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method:  "POST",
-        headers: {
-          Authorization:  `Basic ${credentials}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          To:   to,
-          From: from,
-          Body: `Your Novarite verification code is: ${code}\n\nExpires in 10 minutes. Do not share this code.`,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const data = await response.json() as { message?: string };
-      return {
-        ok:    false,
-        error: data.message ?? `Twilio error ${response.status}`,
-      };
-    }
-
+    const client = twilio(creds.accountSid, creds.authToken);
+    await client.verify.v2
+      .services(creds.serviceSid)
+      .verifications.create({ to, channel: "sms" });
     return { ok: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return { ok: false, error: `Failed to send SMS: ${message}` };
+    return { ok: false, error: `Failed to send verification SMS: ${message}` };
+  }
+}
+
+export async function checkPhoneVerification(
+  to:   string,
+  code: string,
+): Promise<VerifyResult> {
+  const creds = getCredentials();
+  if (!creds) return missingError();
+
+  try {
+    const client = twilio(creds.accountSid, creds.authToken);
+    const check  = await client.verify.v2
+      .services(creds.serviceSid)
+      .verificationChecks.create({ to, code });
+
+    if (check.status === "approved") return { ok: true };
+    return { ok: false, error: "Invalid or expired verification code." };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return { ok: false, error: `Verification check failed: ${message}` };
   }
 }
