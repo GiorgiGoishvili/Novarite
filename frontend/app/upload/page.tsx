@@ -40,8 +40,11 @@ async function publishGameToSupabase(game: GameListing): Promise<{ ok: boolean; 
       }),
     });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as { error?: string };
-      return { ok: false, error: body.error ?? `Server error (${res.status})` };
+      const body = await res.json().catch(() => ({})) as { error?: string; details?: string; code?: string; hint?: string };
+      const msg  = body.details || body.error || `Server error (${res.status})`;
+      const code = body.code ? ` [${body.code}]` : "";
+      const hint = body.hint ? ` — ${body.hint}` : "";
+      return { ok: false, error: `${msg}${code}${hint}` };
     }
     return { ok: true };
   } catch (err) {

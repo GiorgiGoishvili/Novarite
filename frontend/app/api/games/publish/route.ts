@@ -69,8 +69,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[games/publish] Supabase error:", error.message);
-      return json({ error: "Failed to save game." }, 500);
+      console.error("[games/publish] Supabase error:", {
+        message:     error.message,
+        code:        error.code,
+        details:     error.details,
+        hint:        error.hint,
+        payloadKeys: Object.keys(row),
+      });
+      return json({
+        error:   "Failed to save game.",
+        details: error.message,
+        code:    error.code    ?? null,
+        hint:    error.hint    ?? null,
+      }, 500);
     }
 
     const result = data as { id: string; local_game_id: string };
