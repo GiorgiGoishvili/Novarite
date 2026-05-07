@@ -10,11 +10,17 @@ import Footer from "@/components/Footer";
 import { saveGame, type GameListing } from "@/lib/games";
 import { isValidPublicKey, SOLANA_NETWORK } from "@/lib/solana";
 
-async function publishGameToSupabase(game: GameListing): Promise<{ ok: boolean; error?: string }> {
+async function publishGameToSupabase(
+  game:        GameListing,
+  accessToken: string,
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch("/api/games/publish", {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+      },
       body: JSON.stringify({
         local_game_id:      game.id,
         title:              game.title,
@@ -108,7 +114,7 @@ function FieldError({ msg }: { msg?: string }) {
 }
 
 export default function UploadPage() {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, session, isAuthenticated, isLoading } = useAuth();
   const { publicKey } = useWallet();
   const router = useRouter();
 
@@ -217,7 +223,7 @@ export default function UploadPage() {
       visibility:        "published",
     });
 
-    const result = await publishGameToSupabase(game);
+    const result = await publishGameToSupabase(game, session?.access_token ?? "");
     setIsSaving(false);
 
     if (!result.ok) {

@@ -8,18 +8,57 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const router = useRouter();
   const [username, setUsername] = useState("");
-  const [email, setEmail]       = useState("");
+  const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm]   = useState("");
-  const [error, setError]       = useState<string | null>(null);
+  const [confirm,  setConfirm]  = useState("");
+  const [error,    setError]    = useState<string | null>(null);
+  const [loading,  setLoading]  = useState(false);
+  const [checkEmail, setCheckEmail] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (password !== confirm)  { setError("Passwords do not match."); return; }
     if (password.length < 6)   { setError("Password must be at least 6 characters."); return; }
-    const err = register(username.trim(), email, password);
-    if (err) { setError(err); return; }
+    setError(null);
+    setLoading(true);
+    const result = await register(username.trim(), email, password);
+    setLoading(false);
+
+    if (result === "__CHECK_EMAIL__") {
+      // Supabase requires email confirmation — tell the user
+      setCheckEmail(true);
+      return;
+    }
+    if (result) { setError(result); return; }
     router.push("/");
+  }
+
+  if (checkEmail) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-nr-surface px-5 py-12">
+        <div className="w-full max-w-sm text-center">
+          <div className="mb-8">
+            <a href="/" className="inline-flex items-center gap-2 mb-5">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="11" stroke="#DC2626" strokeWidth="1.5" fill="none" />
+                <polygon points="12,8 16,10.5 16,13.5 12,16 8,13.5 8,10.5" fill="#DC2626" opacity="0.9" />
+              </svg>
+              <span className="font-sans text-lg font-bold text-nr-ink">Novarite</span>
+            </a>
+          </div>
+          <div className="rounded-xl border border-nr-border bg-white p-7 shadow-card">
+            <p className="font-sans text-2xl font-extrabold text-nr-ink mb-3">Check your email</p>
+            <p className="font-sans text-sm text-nr-muted leading-relaxed">
+              We sent a confirmation link to <strong>{email}</strong>.
+              Click it to activate your account, then{" "}
+              <a href="/login" className="font-semibold text-nr-red hover:text-nr-redhover">
+                sign in
+              </a>.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -61,6 +100,9 @@ export default function RegisterPage() {
                 className="w-full rounded-lg border border-nr-border bg-white px-4 py-2.5 font-sans text-sm text-nr-ink placeholder-nr-placeholder outline-none transition-colors focus:border-nr-red focus:ring-2 focus:ring-nr-red/10"
                 placeholder="your_handle"
               />
+              <p className="mt-1 font-sans text-xs text-nr-faint">
+                3–30 characters. Letters, digits, _ or - only.
+              </p>
             </div>
 
             <div>
@@ -107,9 +149,10 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-nr-red py-2.5 font-sans text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nr-redhover"
+              disabled={loading}
+              className="w-full rounded-lg bg-nr-red py-2.5 font-sans text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nr-redhover disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Create account
+              {loading ? "Creating account…" : "Create account"}
             </button>
           </form>
         </div>

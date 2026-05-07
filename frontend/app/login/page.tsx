@@ -7,13 +7,17 @@ import { useAuth } from "../../components/AuthProvider";
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
-  const [email, setEmail]       = useState("");
+  const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError]       = useState<string | null>(null);
+  const [error,    setError]    = useState<string | null>(null);
+  const [loading,  setLoading]  = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const err = login(email, password);
+    setError(null);
+    setLoading(true);
+    const err = await login(email, password);
+    setLoading(false);
     if (err) { setError(err); return; }
     router.push("/");
   }
@@ -73,9 +77,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-nr-red py-2.5 font-sans text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nr-redhover"
+              disabled={loading}
+              className="w-full rounded-lg bg-nr-red py-2.5 font-sans text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nr-redhover disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Sign in
+              {loading ? "Signing in…" : "Sign in"}
             </button>
           </form>
         </div>

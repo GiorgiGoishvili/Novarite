@@ -181,10 +181,11 @@ export default function ProfilePage() {
   const { connection } = useConnection();
   const router = useRouter();
 
-  // Section save badges
+  // Section save badges and errors
   const [profileSaved, setProfileSaved] = useState(false);
   const [contactSaved, setContactSaved] = useState(false);
   const [socialSaved,  setSocialSaved]  = useState(false);
+  const [profileSaveErr, setProfileSaveErr] = useState("");
 
   // Email verification
   const [emailStep,    setEmailStep]    = useState<VerifyStep>("idle");
@@ -300,9 +301,20 @@ export default function ProfilePage() {
     setTimeout(() => setter(false), 2500);
   }
 
-  function handleSaveProfile() { saveProfile(); flash(setProfileSaved); }
-  function handleSaveContact()  { saveProfile(); flash(setContactSaved); }
-  function handleSaveSocial()   { saveProfile(); flash(setSocialSaved); }
+  async function handleSaveProfile() {
+    setProfileSaveErr("");
+    const { error } = await saveProfile();
+    if (error) { setProfileSaveErr(error); return; }
+    flash(setProfileSaved);
+  }
+  async function handleSaveContact() {
+    const { error } = await saveProfile();
+    if (!error) flash(setContactSaved);
+  }
+  async function handleSaveSocial() {
+    const { error } = await saveProfile();
+    if (!error) flash(setSocialSaved);
+  }
 
   // ── email verification ─────────────────────────────────────────────────────
 
@@ -350,7 +362,7 @@ export default function ProfilePage() {
       const data = await res.json() as ApiResponse;
 
       if (res.ok) {
-        updateAndSave({ emailVerified: true });
+        await updateAndSave({ emailVerified: true });
         setEmailStep("verified");
         setEmailCode("");
       } else {
@@ -408,7 +420,7 @@ export default function ProfilePage() {
       const data = await res.json() as ApiResponse;
 
       if (res.ok) {
-        updateAndSave({ phoneVerified: true });
+        await updateAndSave({ phoneVerified: true });
         setPhoneStep("verified");
         setPhoneCode("");
       } else {
@@ -423,13 +435,13 @@ export default function ProfilePage() {
 
   // ── password change ────────────────────────────────────────────────────────
 
-  function handlePasswordChange(e: FormEvent) {
+  async function handlePasswordChange(e: FormEvent) {
     e.preventDefault();
     setPwdError("");
     setPwdOK(false);
     if (pwd.next.length < 8)      { setPwdError("New password must be at least 8 characters."); return; }
     if (pwd.next !== pwd.confirm) { setPwdError("Passwords do not match."); return; }
-    const err = changePassword(pwd.current, pwd.next);
+    const err = await changePassword(pwd.current, pwd.next);
     if (err) { setPwdError(err); return; }
     setPwdOK(true);
     setPwd({ current: "", next: "", confirm: "" });
@@ -522,8 +534,8 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="mb-1.5 block font-sans text-xs font-medium text-nr-body">Username</label>
-                  <input type="text" value={profile.username} onChange={(e) => updateProfile({ username: e.target.value })} className={ic()} />
-                  <p className="mt-1 font-sans text-xs text-nr-faint">Prototype: local only.</p>
+                  <input type="text" value={profile.username} onChange={(e) => { updateProfile({ username: e.target.value }); setProfileSaveErr(""); }} className={ic()} />
+                  <p className="mt-1 font-sans text-xs text-nr-faint">Unique. Changing it will update your public profile URL.</p>
                 </div>
                 <div>
                   <label className="mb-1.5 block font-sans text-xs font-medium text-nr-body">Studio / team name</label>
@@ -544,11 +556,14 @@ export default function ProfilePage() {
                 <textarea value={profile.bio} onChange={(e) => updateProfile({ bio: e.target.value })} rows={3} placeholder="Tell players a bit about yourself…" className={`${ic()} resize-none`} />
               </div>
 
-              <div className="mt-5 flex items-center gap-3">
+              <div className="mt-5 flex items-center gap-3 flex-wrap">
                 <button onClick={handleSaveProfile} className="rounded-lg bg-nr-red px-5 py-2.5 font-sans text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nr-redhover">
                   Save profile
                 </button>
                 <SavedBadge show={profileSaved} />
+                {profileSaveErr && (
+                  <span className="font-sans text-sm font-medium text-nr-red">{profileSaveErr}</span>
+                )}
               </div>
             </SectionCard>
 
@@ -927,9 +942,7 @@ export default function ProfilePage() {
                 </div>
                 {pwdError && <FieldError msg={pwdError} />}
                 {pwdSuccess && (
-                  <ProtoNote>
-                    Password updated (prototype mode — stored locally). Backend password hashing will be connected later.
-                  </ProtoNote>
+                  <p className="font-sans text-sm font-medium text-green-600">Password updated successfully.</p>
                 )}
                 <div>
                   <button type="submit" className="rounded-lg bg-nr-red px-5 py-2.5 font-sans text-sm font-semibold text-white shadow-sm transition-colors hover:bg-nr-redhover">
@@ -999,7 +1012,7 @@ export default function ProfilePage() {
             </SectionCard>
 
             <p className="pb-4 text-center font-sans text-xs text-nr-faint">
-              All data is stored locally for this prototype. A real backend will be connected later.
+              Your profile is saved to your Novarite account.
             </p>
 
           </div>
