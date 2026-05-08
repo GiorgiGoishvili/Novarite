@@ -48,6 +48,37 @@ This repository contains the core prototype for Novarite.
 - [Technical Architecture](docs/technichal_architecture.md)
 - [Public Messaging](docs/public_messaging.md)
 
+## QVAC Local AI Discovery
+
+Novarite integrates the **QVAC SDK** as a local-first AI discovery engine.
+Players describe what they want to play in natural language and Novarite matches
+the request against indie game metadata using on-device semantic embeddings
+(GTE-Large FP16 via the QVAC runtime).
+
+This solves a real platform problem: small indie games are hard to find, and
+players often do not know exact tags or genres. QVAC enables natural-language
+discovery while keeping all user queries private — nothing is sent to a cloud AI
+service.
+
+**Try it:**
+
+```bash
+node qvac/game-discovery.mjs "cozy relaxing game with crafting"
+node qvac/game-discovery.mjs "dark difficult platformer with combat"
+```
+
+**Start the local API server** (connects to the `/ai-discovery` frontend page):
+
+```bash
+node qvac/server.mjs
+```
+
+**Customer-facing page:** `/ai-discovery` — describes what you want to play,
+shows ranked game cards with match scores and reasons.
+
+See [`qvac/README.md`](qvac/README.md) for full documentation, troubleshooting,
+and architecture notes.
+
 ## Status
 
 Early hackathon prototype currently under active development.

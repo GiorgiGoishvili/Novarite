@@ -134,7 +134,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       }
 
       if (data) {
-        setProfile(rowToProfile(data as ProfileRow));
+        setProfile(rowToProfile(data as unknown as ProfileRow));
       } else {
         // No profile row yet — build a sensible default and persist it.
         // This handles the edge case where profile creation failed at registration.

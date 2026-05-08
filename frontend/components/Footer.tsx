@@ -3,6 +3,7 @@ import { SITE_LINKS } from "@/lib/siteLinks";
 const LINKS = {
   Platform: [
     { label: "Browse games",  href: "/#games" },
+    { label: "AI Discovery",  href: "/ai-discovery" },
     { label: "Upload a game", href: "/upload" },
     { label: "Dev dashboard", href: "/#dashboard" },
   ],

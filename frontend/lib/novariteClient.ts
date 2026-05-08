@@ -1,6 +1,23 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
-import type { MockGame } from "./mockGames";
+
+export interface OnChainGame {
+  id: string;
+  slug: string;
+  title: string;
+  developer: string;
+  engine: string;
+  genre: string;
+  tags: string[];
+  description: string;
+  price: number;
+  players: number;
+  rating: number;
+  coverColor: string;
+  coverEmoji: string;
+  badge?: string;
+  playInBrowser: boolean;
+}
 
 const NOVARITE_IDL = {
   address: process.env.NEXT_PUBLIC_PROGRAM_ID ?? "",
@@ -42,7 +59,7 @@ async function gameListingDiscriminator(): Promise<Uint8Array> {
 export async function fetchAllGames(
   connection: Connection,
   programId: PublicKey
-): Promise<MockGame[]> {
+): Promise<OnChainGame[]> {
   const discriminator = await gameListingDiscriminator();
 
   const idl = structuredClone(NOVARITE_IDL) as unknown as Idl;
