@@ -4,6 +4,9 @@ import type { GameListing } from "@/lib/games";
 
 export const dynamic = "force-dynamic";
 
+// Titles that must never appear in the marketplace regardless of DB state.
+const BLOCKED_TITLES = new Set(["Space guy", "Space Guy", "Novastrike"]);
+
 function json(body: object, status = 200) {
   return NextResponse.json(body, { status });
 }
@@ -77,7 +80,9 @@ export async function GET() {
       return json({ error: "Failed to fetch games." }, 500);
     }
 
-    const games = (data as unknown as GamesRow[]).map(rowToGameListing);
+    const games = (data as unknown as GamesRow[])
+      .filter((row) => !BLOCKED_TITLES.has(row.title))
+      .map(rowToGameListing);
     return json({ games });
   } catch (err) {
     console.error("[games/published] Unexpected:", err instanceof Error ? err.message : err);

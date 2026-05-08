@@ -60,6 +60,9 @@ interface BrowsableGame {
   source: "local" | "onchain" | "supabase";
 }
 
+// Titles permanently blocked from the marketplace regardless of source.
+const BLOCKED_GAME_TITLES = new Set(["Space guy", "Space Guy", "Novastrike"]);
+
 // ─── cover art generators (deterministic from id) ─────────────────────────────
 
 const COVER_COLORS = ["#6366F1", "#DC2626", "#059669", "#D97706", "#7C3AED", "#2563EB", "#DB2777"];
@@ -279,6 +282,11 @@ function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | nul
   }
 
   async function handleBuy() {
+    console.log("[BuyButton] game", game.title);
+    console.log("[BuyButton] priceSol", game.priceSol);
+    console.log("[BuyButton] receiver", game.developerWallet);
+    console.log("[BuyButton] network", connection.rpcEndpoint);
+    console.log("[BuyButton] buyer", publicKey?.toBase58());
     if (!userId)             { setError("Sign in to buy games."); return; }
     if (!connected || !publicKey) { setError("Connect your Solana wallet first."); return; }
     if (!game.developerWallet)    { setError("Payout wallet not configured for this game."); return; }
@@ -330,11 +338,23 @@ function BuyButton({ game, userId }: { game: BrowsableGame; userId: string | nul
         downloadUrl:   game.downloadUrl,
       });
     } catch (e) {
-      setStep("error");
-      const msg = (e as Error)?.message ?? "";
-      if (msg.includes("User rejected") || msg.includes("rejected the request") || msg.includes("Transaction cancelled")) {
+      setStep("idle");
+      const msg = ((e as Error)?.message ?? "").toLowerCase();
+      if (
+        msg.includes("user rejected") ||
+        msg.includes("rejected the request") ||
+        msg.includes("transaction cancelled") ||
+        msg.includes("transaction rejected")
+      ) {
         setError("Payment cancelled.");
-      } else if (msg.includes("Invalid price")) {
+      } else if (
+        msg.includes("insufficient") ||
+        msg.includes("lamport") ||
+        msg.includes("0x1") ||
+        msg.includes("not enough")
+      ) {
+        setError("Not enough SOL. You need the game price plus a small network fee.");
+      } else if (msg.includes("invalid price")) {
         setError("Invalid price configured for this game.");
       } else {
         setError("Transaction failed. Check your wallet balance and try again.");
@@ -568,7 +588,9 @@ export default function MarketplacePreview() {
 
     // 1. Seed demo game on first load if library is empty, show localStorage games immediately
     seedDemoGamesIfNeeded();
-    const localGames = getPublishedGames().map((g) => localToBrowsable(g, "local"));
+    const localGames = getPublishedGames()
+      .filter((g) => !BLOCKED_GAME_TITLES.has(g.title))
+      .map((g) => localToBrowsable(g, "local"));
     setAllGames(localGames);
 
     // 2. Fetch from Supabase — source of truth, works across all domains/devices
@@ -579,7 +601,9 @@ export default function MarketplacePreview() {
         const data = await res.json() as { games?: GameListing[] };
         if (!active) return;
 
-        const sbGames   = (data.games ?? []).map((g) => localToBrowsable(g, "supabase"));
+        const sbGames   = (data.games ?? [])
+          .filter((g) => !BLOCKED_GAME_TITLES.has(g.title))
+          .map((g) => localToBrowsable(g, "supabase"));
         const sbIds     = new Set(sbGames.map((g) => g.id));
         // Keep local-only games not yet in Supabase (e.g. upload in progress or seed game)
         const localOnly = localGames.filter((g) => !sbIds.has(g.id));

@@ -93,4 +93,12 @@ export const GAMES: Game[] = [
     description:
       "A hand-drawn narrative adventure about a seamstress who discovers her stitches can rewrite memories. Explore a town stitched together from forgotten stories.",
   },
+  {
+    id: "graverush",
+    title: "GraveRush",
+    genre: "FPS",
+    tags: ["fps", "zombie", "survival", "wave-based", "godot", "downloadable", "cosmetics", "solana", "shooter", "retro"],
+    description:
+      "A downloadable wave-based zombie survival FPS built in Godot with retro visuals and Novarite cosmetic integration. Fight off undead hordes in first-person. Free Windows download.",
+  },
 ];
