@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
+import { useProfile } from "@/context/ProfileContext";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import Header from "@/components/Header";
@@ -115,6 +116,7 @@ function FieldError({ msg }: { msg?: string }) {
 
 export default function UploadPage() {
   const { user, session, isAuthenticated, isLoading } = useAuth();
+  const { profile } = useProfile();
   const { publicKey } = useWallet();
   const router = useRouter();
 
@@ -145,6 +147,13 @@ export default function UploadPage() {
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.replace("/login");
   }, [isLoading, isAuthenticated, router]);
+
+  // Production debug
+  useEffect(() => {
+    console.log("[UploadPage] user", user?.id);
+    console.log("[UploadPage] profile", profile);
+    console.log("[UploadPage] isLoading", isLoading);
+  }, [user, profile, isLoading]);
 
   // Auto-fill payout wallet from connected wallet when pricing switches to paid
   useEffect(() => {
@@ -248,7 +257,27 @@ export default function UploadPage() {
     );
   }
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen bg-nr-surface flex items-center justify-center">
+          <div className="text-center">
+            <p className="font-sans text-sm text-nr-muted mb-4">
+              Please sign in to upload a game.
+            </p>
+            <a
+              href="/login"
+              className="rounded-lg bg-nr-red px-5 py-2.5 font-sans text-sm font-semibold text-white hover:bg-nr-redhover transition-colors"
+            >
+              Sign in
+            </a>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   // ── Success screen ─────────────────────────────────────────────────────────
 

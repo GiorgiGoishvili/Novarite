@@ -46,26 +46,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
+    let mounted = true;
 
-        if (session?.user) {
-          const username = await fetchUsername(session.user.id);
+    async function handleSession(session: Session | null) {
+      console.log("[ProfileContext] session", session?.user?.id);
+      setSession(session);
+
+      if (session?.user) {
+        try {
+          console.log("[ProfileContext] profile fetch start");
+          // Race username fetch against a 5 s timeout — on slow networks the
+          // fetch can hang indefinitely, keeping isLoading=true forever.
+          const username = await Promise.race<string | null>([
+            fetchUsername(session.user.id),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+          ]);
+          console.log("[ProfileContext] profile fetch success", username);
+          if (!mounted) return;
           setUser({
             id:       session.user.id,
             username: username ?? fallbackUsername(session.user.email),
             email:    session.user.email ?? "",
           });
-        } else {
-          setUser(null);
+        } catch (err) {
+          console.warn("[ProfileContext] profile fetch error", err);
+          if (!mounted) return;
+          // Auth session is valid — show user from auth data even if profile
+          // table is unreachable.
+          setUser({
+            id:       session.user.id,
+            username: fallbackUsername(session.user.email),
+            email:    session.user.email ?? "",
+          });
         }
-
-        setLoading(false);
+      } else {
+        if (mounted) setUser(null);
       }
+
+      if (mounted) {
+        setLoading(false);
+        console.log("[ProfileContext] loading=false");
+      }
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => { void handleSession(session); }
     );
 
-    return () => subscription.unsubscribe();
+    // Safety net: if INITIAL_SESSION never fires (Supabase misconfigured,
+    // network error, or extension conflict), force loading=false after 8 s
+    // so the UI never stays frozen on "Loading…" indefinitely.
+    const safetyTimer = setTimeout(() => {
+      if (mounted) {
+        console.warn("[ProfileContext] safety timeout — forcing loading=false");
+        setLoading(false);
+      }
+    }, 8000);
+
+    return () => {
+      mounted = false;
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // ── Auth actions ─────────────────────────────────────────────────────────

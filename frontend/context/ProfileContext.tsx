@@ -92,10 +92,34 @@ function profileToUpsertRow(profile: Profile, userId: string) {
   };
 }
 
+// ── Fallback profile from auth user ───────────────────────────────────────
+
+function buildFallbackProfile(user: { username: string; email: string }): Profile {
+  return {
+    username:      user.username,
+    displayName:   user.username,
+    bio:           "",
+    location:      "",
+    studioName:    "",
+    role:          "",
+    avatarColor:   "#DC2626",
+    avatarUrl:     "",
+    email:         user.email,
+    phone:         "",
+    emailVerified: false,
+    phoneVerified: false,
+    socialX:       "",
+    socialGithub:  "",
+    socialLinkedin: "",
+    socialWebsite: "",
+  };
+}
+
 // ── Context type ───────────────────────────────────────────────────────────
 
 interface ProfileContextValue {
   profile:       Profile | null;
+  loading:       boolean;
   updateProfile: (updates: Partial<Profile>) => void;
   saveProfile:   () => Promise<{ error: string | null }>;
   updateAndSave: (updates: Partial<Profile>) => Promise<void>;
@@ -113,58 +137,67 @@ const PROFILE_COLUMNS =
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(false);
 
   // Load or create profile whenever the signed-in user changes
   useEffect(() => {
     if (!user?.id) {
       setProfile(null);
+      setLoading(false);
       return;
     }
 
+    let mounted = true;
+    setLoading(true);
+    console.log("[ProfileContext] fetch start", user.id);
+
     void (async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(PROFILE_COLUMNS)
-        .eq("id", user.id)
-        .maybeSingle();
+      try {
+        const { data, error } = await Promise.race([
+          supabase
+            .from("profiles")
+            .select(PROFILE_COLUMNS)
+            .eq("id", user.id)
+            .maybeSingle(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Profile fetch timeout")), 5000)
+          ),
+        ]);
 
-      if (error) {
-        console.error("[ProfileContext] Load failed:", error.message);
-        return;
-      }
+        if (!mounted) return;
 
-      if (data) {
-        setProfile(rowToProfile(data as unknown as ProfileRow));
-      } else {
-        // No profile row yet — build a sensible default and persist it.
-        // This handles the edge case where profile creation failed at registration.
-        const defaults: Profile = {
-          username:      user.username,
-          displayName:   user.username,
-          bio:           "",
-          location:      "",
-          studioName:    "",
-          role:          "",
-          avatarColor:   "#DC2626",
-          avatarUrl:     "",
-          email:         user.email,
-          phone:         "",
-          emailVerified: false,
-          phoneVerified: false,
-          socialX:       "",
-          socialGithub:  "",
-          socialLinkedin: "",
-          socialWebsite: "",
-        };
-        setProfile(defaults);
-        const { error: insertErr } = await supabase
-          .from("profiles")
-          .insert(profileToUpsertRow(defaults, user.id));
-        if (insertErr) {
-          console.error("[ProfileContext] Default profile insert failed:", insertErr.message);
+        if (error) {
+          console.warn("[ProfileContext] Load failed, using fallback:", error.message);
+          setProfile(buildFallbackProfile(user));
+          return;
+        }
+
+        if (data) {
+          console.log("[ProfileContext] fetch success");
+          setProfile(rowToProfile(data as unknown as ProfileRow));
+        } else {
+          console.log("[ProfileContext] no row, creating default");
+          const defaults = buildFallbackProfile(user);
+          setProfile(defaults);
+          const { error: insertErr } = await supabase
+            .from("profiles")
+            .insert(profileToUpsertRow(defaults, user.id));
+          if (insertErr) {
+            console.error("[ProfileContext] Default profile insert failed:", insertErr.message);
+          }
+        }
+      } catch (err) {
+        console.warn("[ProfileContext] fetch error, using fallback:", err);
+        if (mounted) setProfile(buildFallbackProfile(user));
+      } finally {
+        if (mounted) {
+          setLoading(false);
+          console.log("[ProfileContext] loading=false");
         }
       }
     })();
+
+    return () => { mounted = false; };
   }, [user?.id, user?.username, user?.email]);
 
   // ── Mutations ──────────────────────────────────────────────────────────
@@ -207,7 +240,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ProfileContext.Provider value={{ profile, updateProfile, saveProfile, updateAndSave }}>
+    <ProfileContext.Provider value={{ profile, loading, updateProfile, saveProfile, updateAndSave }}>
       {children}
     </ProfileContext.Provider>
   );
