@@ -77,9 +77,11 @@ frontend/app/ai-discovery/     # /ai-discovery page
 ```bash
 node qvac/game-discovery.mjs
 node qvac/game-discovery.mjs "cozy relaxing game with crafting"
-node qvac/game-discovery.mjs "dark difficult platformer with exploration and combat"
+node qvac/game-discovery.mjs "underwater survival exploration"
+node qvac/game-discovery.mjs "hard metroidvania with bosses"
+node qvac/game-discovery.mjs "roguelike card game"
+node qvac/game-discovery.mjs "downloadable zombie shooter"
 node qvac/game-discovery.mjs "short scary horror game"
-node qvac/game-discovery.mjs "turn-based pixel RPG"
 ```
 
 ### Local API server
@@ -110,15 +112,15 @@ Query: "cozy relaxing game with crafting"
 
 Top 5 recommendations  [QVAC local embeddings (GTE-Large FP16)]
 
-  1. Verdant Hollow  (Farming Sim)
-     86.5% match
+  1. Stardew Valley  (Farming Sim)
+     89.2% match
      Why   : Matched on: cozy, relaxing, crafting
-     Blurb : Restore an overgrown farm in a sleepy valley. Plant crops, befriend…
+     Blurb : Rebuild your grandfather's farm in a charming valley full of secrets…
 
-  2. Prism Shift  (Puzzle)
-     79.7% match
-     Why   : Matched on: relaxing
-     Blurb : Minimalist color-refraction puzzles. Redirect beams of light through…
+  2. Core Keeper  (Survival Sandbox)
+     84.1% match
+     Why   : Matched on: crafting
+     Blurb : Mine, build, and fight underground in a procedurally generated cavern…
   ...
 ```
 
@@ -129,8 +131,8 @@ Top 5 recommendations  [QVAC local embeddings (GTE-Large FP16)]
 Each game's text representation is built as:
 
 ```
-"Verdant Hollow — Farming Sim. Tags: cozy, relaxing, crafting, nature, story, multiplayer.
- Restore an overgrown farm in a sleepy valley. Plant crops, befriend villagers…"
+"Stardew Valley — Farming Sim. Tags: farming, cozy, life-sim, rpg, relaxing, crafting, …
+ Rebuild your grandfather's farm in a charming valley full of secrets and friendly townsfolk…"
 ```
 
 This is passed to the GTE-Large model which returns a 1024-dimensional float

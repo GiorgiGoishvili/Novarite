@@ -1,6 +1,6 @@
 # Novarite Frontend
 
-Next.js 14 + TypeScript + Tailwind CSS landing page for the Novarite indie game platform.
+Next.js 14 + TypeScript + Tailwind CSS frontend for the Novarite indie game platform.
 
 ## Getting started
 
@@ -16,30 +16,37 @@ Visit [http://localhost:3000](http://localhost:3000).
 
 - **Next.js 14** — App Router, React Server Components
 - **TypeScript** — strict mode
-- **Tailwind CSS** — dark futuristic design system
+- **Tailwind CSS** — white/clean design system
+- **Supabase** — auth, profiles, game publishing, purchases
+- **Solana/Anchor** — on-chain payment flow (devnet)
 
 ## Structure
 
 ```
 app/
-  layout.tsx          Root layout + metadata
-  page.tsx            Landing page (assembles all sections)
-  globals.css         Tailwind imports + custom utilities
+  layout.tsx              Root layout + metadata
+  page.tsx                Landing page
+  upload/page.tsx         Game upload + publishing flow
+  profile/page.tsx        User profile page
+  ai-discovery/page.tsx   AI Game Discovery (QVAC-powered)
+  login/page.tsx          Auth (email + phone)
+  api/
+    games/published/      Supabase-backed published games API
 
 components/
-  Header.tsx          Fixed nav + Connect Wallet placeholder
-  Hero.tsx            Main headline + CTA
-  FeatureGrid.tsx     6-feature card grid
-  MarketplacePreview.tsx  Game cards with mock buy flow
-  CreatorDashboardPreview.tsx  Mock stats + recent sales table
-  Footer.tsx          Links + Colosseum badge
+  Header.tsx              Nav + auth state
+  Footer.tsx              Links
+  MarketplacePreview.tsx  Live game cards from Supabase
+  Hero.tsx                Main headline + CTA
+  FeatureGrid.tsx         Feature card grid
+
+context/
+  AuthContext.tsx         Supabase auth session
+  ProfileContext.tsx      User profile row fetch + fallback
 
 lib/
-  mockGames.ts        Typed mock data for 6 games
+  gameData.ts             Reference game catalogue (111 games) for AI Discovery
+  localDiscover.ts        Browser-side fallback matching for AI Discovery
+  seedGames.ts            localStorage seeding + stale-entry purge
+  solanaPayment.ts        Solana devnet payment helpers
 ```
-
-## Wallet integration (future)
-
-The "Connect Wallet" button is a UI placeholder. Full Solana wallet integration
-(using `@solana/wallet-adapter-react`) and live on-chain reads are the next step
-after the hackathon MVP.
