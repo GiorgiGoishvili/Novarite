@@ -12,13 +12,15 @@
 import { GAMES, type Game } from "./gameData";
 
 export interface Recommendation {
-  id: string;
-  title: string;
-  genre: string;
-  tags: string[];
-  description: string;
-  score: number;
-  reason: string;
+  id:                string;
+  title:             string;
+  genre:             string;
+  tags:              string[];
+  description:       string;
+  score:             number;
+  reason:            string;
+  novariteAvailable: boolean;
+  novariteNote:      string;
 }
 
 function buildReason(game: Game, query: string): string {
@@ -41,19 +43,23 @@ export function localRecommend(query: string, topN = 5): Recommendation[] {
     }
     const tagBonus =
       game.tags.filter((t) => query.toLowerCase().includes(t)).length * 0.15;
+    // Novarite games get a small boost so they surface when relevant
+    const novariteBonus = game.novariteAvailable ? 0.05 : 0;
     const score = Math.min(
-      (overlap / Math.max(words.length, 1)) * 0.7 + tagBonus,
+      (overlap / Math.max(words.length, 1)) * 0.7 + tagBonus + novariteBonus,
       1.0
     );
 
     return {
-      id: game.id,
-      title: game.title,
-      genre: game.genre,
-      tags: game.tags,
-      description: game.description,
-      score: parseFloat(score.toFixed(4)),
-      reason: buildReason(game, query),
+      id:                game.id,
+      title:             game.title,
+      genre:             game.genre,
+      tags:              game.tags,
+      description:       game.description,
+      score:             parseFloat(score.toFixed(4)),
+      reason:            buildReason(game, query),
+      novariteAvailable: game.novariteAvailable,
+      novariteNote:      game.novariteNote,
     };
   });
 

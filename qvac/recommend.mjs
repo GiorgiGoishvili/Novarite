@@ -39,13 +39,15 @@ function fallbackRecommend(query, topN) {
       1.0
     );
     return {
-      id: game.id,
-      title: game.title,
-      genre: game.genre,
-      tags: game.tags,
-      description: game.description,
-      score: parseFloat(score.toFixed(4)),
-      reason: buildReason(game, query),
+      id:                game.id,
+      title:             game.title,
+      genre:             game.genre,
+      tags:              game.tags,
+      description:       game.description,
+      score:             parseFloat(score.toFixed(4)),
+      reason:            buildReason(game, query),
+      novariteAvailable: game.novariteAvailable ?? false,
+      novariteNote:      game.novariteNote ?? "Reference recommendation only",
     };
   });
 
@@ -87,15 +89,17 @@ export async function recommend(query, topN = 5) {
     const { embedding: queryEmbedding } = await embed({ modelId, text: query });
 
     const results = GAMES.map((game, i) => ({
-      id: game.id,
-      title: game.title,
-      genre: game.genre,
-      tags: game.tags,
-      description: game.description,
-      score: parseFloat(
+      id:                game.id,
+      title:             game.title,
+      genre:             game.genre,
+      tags:              game.tags,
+      description:       game.description,
+      score:             parseFloat(
         cosineSimilarity(queryEmbedding, gameEmbeddings[i]).toFixed(4)
       ),
-      reason: buildReason(game, query),
+      reason:            buildReason(game, query),
+      novariteAvailable: game.novariteAvailable ?? false,
+      novariteNote:      game.novariteNote ?? "Reference recommendation only",
     }))
       .sort((a, b) => b.score - a.score)
       .slice(0, topN);

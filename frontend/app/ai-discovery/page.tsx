@@ -6,11 +6,16 @@ import Footer from "@/components/Footer";
 import { localRecommend, type Recommendation } from "@/lib/localDiscover";
 
 const EXAMPLES = [
-  "cozy relaxing game with crafting",
-  "dark difficult platformer with exploration and combat",
   "short scary horror game",
-  "turn-based pixel RPG with story",
-  "fast space shooter with high scores",
+  "metroidvania with hard bosses",
+  "underwater survival exploration",
+  "roguelike card game",
+  "cozy farming game",
+  "fast FPS arena shooter",
+  "soulslike pixel art",
+  "open world survival crafting",
+  "downloadable zombie shooter",
+  "platformer adventure demo",
 ];
 
 interface QVACResponse {
@@ -19,9 +24,9 @@ interface QVACResponse {
 }
 
 export default function AIDiscoveryPage() {
-  const [query, setQuery]   = useState("");
+  const [query,   setQuery]   = useState("");
   const [results, setResults] = useState<Recommendation[] | null>(null);
-  const [mode, setMode]     = useState<"qvac" | "local" | null>(null);
+  const [mode,    setMode]    = useState<"qvac" | "local" | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function runSearch(q: string) {
@@ -29,14 +34,13 @@ export default function AIDiscoveryPage() {
     setLoading(true);
     setResults(null);
 
-    // Try local QVAC API server first (only available when running locally)
     const apiUrl = process.env.NEXT_PUBLIC_QVAC_API_URL;
     if (apiUrl) {
       try {
         const res = await fetch(`${apiUrl}/recommend`, {
-          method: "POST",
+          method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: q }),
+          body:    JSON.stringify({ query: q }),
         });
         if (res.ok) {
           const data = (await res.json()) as QVACResponse;
@@ -50,7 +54,6 @@ export default function AIDiscoveryPage() {
       }
     }
 
-    // Browser-side fallback: lightweight word + tag overlap matching
     setResults(localRecommend(q));
     setMode("local");
     setLoading(false);
@@ -77,8 +80,9 @@ export default function AIDiscoveryPage() {
               AI Game Discovery
             </h1>
             <p className="mt-3 font-sans text-base text-nr-muted max-w-lg mx-auto">
-              Describe what you want to play. Novarite recommends matching indie
-              games — no exact keywords needed.
+              Search by mood, genre, difficulty, length, or similarity. QVAC
+              local matching recommends games from a real reference catalogue and
+              highlights Novarite games when available.
             </p>
           </div>
         </section>
@@ -95,7 +99,7 @@ export default function AIDiscoveryPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 rows={3}
-                placeholder="I want a cozy relaxing game with crafting and a good story…"
+                placeholder="games like Hollow Knight, cozy farming sim, hard soulslike with bosses…"
                 className="w-full rounded-lg border border-nr-border bg-white px-4 py-3 font-sans text-sm text-nr-ink placeholder-nr-placeholder outline-none transition-colors focus:border-nr-red focus:ring-2 focus:ring-nr-red/10 resize-none"
               />
 
@@ -146,50 +150,12 @@ export default function AIDiscoveryPage() {
               </div>
 
               {results.map((rec, i) => (
-                <div
-                  key={rec.id}
-                  className="rounded-xl border border-nr-border bg-white p-5 shadow-card transition-shadow hover:shadow-card-md"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="font-sans text-base font-bold text-nr-ink truncate">
-                        {rec.title}
-                      </h3>
-                      <span className="mt-1 inline-block rounded-full bg-nr-panel px-2 py-0.5 font-sans text-[11px] font-medium text-nr-muted">
-                        {rec.genre}
-                      </span>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <div className="font-sans text-xl font-extrabold text-nr-red leading-none">
-                        {mode === "qvac"
-                          ? `${Math.round(rec.score * 100)}%`
-                          : `#${i + 1}`}
-                      </div>
-                      <div className="mt-0.5 font-sans text-[10px] text-nr-faint">
-                        {mode === "qvac" ? "match" : "rank"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="mt-2.5 font-sans text-xs font-semibold text-nr-indigo">
-                    {rec.reason}
-                  </p>
-                  <p className="mt-1.5 font-sans text-sm text-nr-body leading-relaxed">
-                    {rec.description}
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {rec.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-md border border-nr-border bg-nr-surface px-2 py-0.5 font-sans text-[11px] text-nr-muted"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                <ResultCard key={rec.id} rec={rec} rank={i + 1} mode={mode} />
               ))}
+
+              <p className="font-sans text-[11px] text-nr-faint text-center leading-relaxed">
+                Reference games are real titles not hosted on Novarite — recommendations only, no downloads available here.
+              </p>
             </div>
           )}
 
@@ -212,18 +178,18 @@ export default function AIDiscoveryPage() {
                 <p className="mt-1.5 font-sans text-xs text-nr-body leading-relaxed">
                   Novarite&apos;s discovery engine uses{" "}
                   <strong>QVAC embeddings</strong> (GTE-Large FP16) to match
-                  natural language queries against indie game metadata entirely
-                  on-device. Your search preferences never leave your machine —
-                  no cloud AI API, no tracking, no rate limits.
+                  natural language queries against a real game reference catalogue
+                  entirely on-device. Your search preferences never leave your
+                  machine — no cloud AI API, no tracking, no rate limits.
                 </p>
                 <p className="mt-2 font-sans text-xs text-nr-muted leading-relaxed">
-                  The hosted web page uses lightweight browser-side matching as
-                  a demo. Run the local QVAC CLI or start the API server for
-                  full semantic embeddings:
+                  The hosted web page uses lightweight browser-side matching as a
+                  demo. Run the local QVAC CLI or start the API server for full
+                  semantic embeddings:
                 </p>
                 <div className="mt-3 flex flex-col gap-2">
                   <code className="block rounded-lg border border-nr-indigoborder bg-white px-3 py-2 font-mono text-xs text-nr-ink overflow-x-auto">
-                    node qvac/game-discovery.mjs &quot;cozy relaxing game with crafting&quot;
+                    node qvac/game-discovery.mjs &quot;underwater survival exploration&quot;
                   </code>
                   <code className="block rounded-lg border border-nr-indigoborder bg-white px-3 py-2 font-mono text-xs text-nr-ink overflow-x-auto">
                     node qvac/server.mjs
@@ -236,7 +202,7 @@ export default function AIDiscoveryPage() {
             </div>
           </div>
 
-          {/* ── Tether QVAC side-track note ─────────────────────────────── */}
+          {/* ── About ───────────────────────────────────────────────────── */}
           <div className="rounded-xl border border-nr-border bg-white p-6 shadow-card">
             <h3 className="font-sans text-sm font-bold text-nr-ink">
               About this integration
@@ -244,19 +210,17 @@ export default function AIDiscoveryPage() {
             <p className="mt-2 font-sans text-xs text-nr-muted leading-relaxed">
               Novarite integrates the <strong>QVAC SDK</strong> as its core game
               discovery engine. QVAC embeddings run locally and on-device to
-              match player intent against indie game metadata using cosine
-              similarity over GTE-Large FP16 vector representations. This
-              directly addresses one of Novarite&apos;s central product problems:
-              small indie games are hard to find, and players often do not know
-              exact tags or genres. QVAC allows natural-language discovery while
-              preserving user privacy — no search query is ever sent to a
-              centralized AI service.
+              match player intent against game metadata using cosine similarity
+              over GTE-Large FP16 vector representations. This directly addresses
+              one of indie gaming&apos;s central problems: small games are hard to
+              find, and players often don&apos;t know exact tags or genres. QVAC
+              allows natural-language discovery while preserving user privacy.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3 text-center">
               {[
-                { label: "On-device", desc: "Model runs locally via QVAC runtime" },
-                { label: "Private",   desc: "Zero queries sent to cloud APIs" },
-                { label: "Offline",   desc: "Works with no internet after first run" },
+                { label: "On-device",  desc: "Model runs locally via QVAC runtime" },
+                { label: "Private",    desc: "Zero queries sent to cloud APIs" },
+                { label: "100+ games", desc: "Real reference catalogue across all genres" },
               ].map(({ label, desc }) => (
                 <div
                   key={label}
@@ -273,5 +237,97 @@ export default function AIDiscoveryPage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+// ── Result card ───────────────────────────────────────────────────────────────
+
+function ResultCard({
+  rec,
+  rank,
+  mode,
+}: {
+  rec:  Recommendation;
+  rank: number;
+  mode: "qvac" | "local" | null;
+}) {
+  const isNovarite = rec.novariteAvailable;
+
+  return (
+    <div
+      className={`rounded-xl border bg-white p-5 shadow-card transition-shadow hover:shadow-card-md ${
+        isNovarite ? "border-nr-red/30 ring-1 ring-nr-red/10" : "border-nr-border"
+      }`}
+    >
+      {/* ── Header row ── */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-sans text-base font-bold text-nr-ink">
+              {rec.title}
+            </h3>
+            {isNovarite ? (
+              <span className="shrink-0 rounded-full border border-nr-red/40 bg-nr-redlight px-2 py-0.5 font-sans text-[10px] font-semibold text-nr-red">
+                Available on Novarite
+              </span>
+            ) : (
+              <span className="shrink-0 rounded-full border border-nr-border bg-nr-panel px-2 py-0.5 font-sans text-[10px] font-medium text-nr-muted">
+                Reference game
+              </span>
+            )}
+          </div>
+          <span className="mt-1 inline-block rounded-full bg-nr-panel px-2 py-0.5 font-sans text-[11px] font-medium text-nr-muted">
+            {rec.genre}
+          </span>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="font-sans text-xl font-extrabold text-nr-red leading-none">
+            {mode === "qvac"
+              ? `${Math.round(rec.score * 100)}%`
+              : `#${rank}`}
+          </div>
+          <div className="mt-0.5 font-sans text-[10px] text-nr-faint">
+            {mode === "qvac" ? "match" : "rank"}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Match reason ── */}
+      <p className="mt-2.5 font-sans text-xs font-semibold text-nr-indigo">
+        {rec.reason}
+      </p>
+
+      {/* ── Description ── */}
+      <p className="mt-1.5 font-sans text-sm text-nr-body leading-relaxed">
+        {rec.description}
+      </p>
+
+      {/* ── Tags ── */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {rec.tags.slice(0, 8).map((tag) => (
+          <span
+            key={tag}
+            className="rounded-md border border-nr-border bg-nr-surface px-2 py-0.5 font-sans text-[11px] text-nr-muted"
+          >
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      {/* ── CTA for Novarite games only ── */}
+      {isNovarite && (
+        <div className="mt-4 pt-3 border-t border-nr-border">
+          <a
+            href="/#games"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-nr-red px-4 py-2 font-sans text-xs font-semibold text-white hover:bg-nr-redhover transition-colors"
+          >
+            View in Browse
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="opacity-80">
+              <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+        </div>
+      )}
+    </div>
   );
 }
