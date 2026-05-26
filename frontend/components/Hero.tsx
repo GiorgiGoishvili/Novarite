@@ -10,10 +10,28 @@ const ENGINE_TAGS = [
   "Unity",
   "Unreal",
   "GameMaker",
+  "Construct",
   "WebGL",
   "ZIP / EXE",
   "Ren'Py",
 ];
+
+// Map engine names to logo paths under /public/images/engines/.
+const ENGINE_LOGOS: Record<string, string> = {
+  "HTML5":     "/images/engines/html5.png",
+  "Godot":     "/images/engines/godot.png",
+  "Unity":     "/images/engines/unity.svg",
+  "Unreal":    "/images/engines/unreal.png",
+  "GameMaker": "/images/engines/gamemaker.webp",
+  "Construct": "/images/engines/construct.svg",
+  "Ren'Py":    "/images/engines/renpy.png",
+};
+
+// Emoji fallback for chips whose logo file doesn't exist yet.
+const ENGINE_CHIP_FALLBACK: Record<string, string> = {
+  "WebGL":     "⬡",
+  "ZIP / EXE": "📦",
+};
 
 const STATS = [
   { value: "0%",       label: "Listing fee" },
@@ -108,8 +126,19 @@ export default function Hero() {
           {ENGINE_TAGS.map((tag) => (
             <span
               key={tag}
-              className="rounded-full border border-nr-border bg-nr-surface px-3 py-0.5 font-mono text-xs text-nr-muted"
+              className="inline-flex items-center gap-1.5 rounded-full border border-nr-border bg-nr-surface px-3 py-0.5 font-mono text-xs text-nr-muted"
             >
+              {ENGINE_LOGOS[tag] ? (
+                <img
+                  src={ENGINE_LOGOS[tag]}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 shrink-0 object-contain"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : ENGINE_CHIP_FALLBACK[tag] ? (
+                <span aria-hidden="true" className="text-[10px] leading-none">{ENGINE_CHIP_FALLBACK[tag]}</span>
+              ) : null}
               {tag}
             </span>
           ))}

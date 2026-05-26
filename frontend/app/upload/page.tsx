@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, useRef, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { useProfile } from "@/context/ProfileContext";
@@ -10,6 +10,101 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { saveGame, type GameListing } from "@/lib/games";
 import { isValidPublicKey, SOLANA_NETWORK } from "@/lib/solana";
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/jpg,image/png,image/webp";
+const MAX_IMAGE_BYTES       = 4 * 1024 * 1024; // 4 MB
+const MAX_SCREENSHOTS       = 5;
+
+const ENGINES = [
+  "HTML5 / Browser",
+  "Godot",
+  "Unity",
+  "Unreal Engine",
+  "GameMaker",
+  "Construct",
+  "Ren'Py",
+  "RPG Maker",
+  "Pygame / Python",
+  "Custom engine",
+  "Other",
+];
+
+const BUILD_TYPES = [
+  { id: "html5",   label: "HTML5 / Browser playable" },
+  { id: "webgl",   label: "WebGL build" },
+  { id: "win",     label: "Windows (.exe / .zip)" },
+  { id: "mac",     label: "macOS (.app / .zip)" },
+  { id: "linux",   label: "Linux (.zip / AppImage)" },
+  { id: "android", label: "Android (.apk)" },
+  { id: "source",  label: "Source code" },
+];
+
+const GENRES = [
+  "Platformer", "Puzzle", "Horror", "Adventure", "RPG", "Simulation",
+  "Strategy", "Farming / Cozy", "Visual Novel", "Shooter", "Arcade",
+  "Sports", "FPS", "Educational", "Other",
+];
+
+const PLATFORMS = [
+  "Windows",
+  "macOS",
+  "Linux",
+  "Web / HTML5",
+  "Android",
+  "Cross-platform",
+];
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface Errors {
+  title?:       string;
+  shortDesc?:   string;
+  gameStatus?:  string;
+  engine?:      string;
+  downloadUrl?: string;
+  priceSol?:    string;
+  payoutWallet?: string;
+  coverImage?:  string;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function FieldError({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return <p className="mt-1 font-sans text-xs text-nr-red">{msg}</p>;
+}
+
+function validateImageFile(file: File): string | null {
+  const allowed = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+  if (!allowed.has(file.type)) return "Only JPG, PNG, and WebP images are accepted.";
+  if (file.size > MAX_IMAGE_BYTES) return "Image must be 4 MB or smaller.";
+  return null;
+}
+
+// ── API helpers ────────────────────────────────────────────────────────────
+
+async function uploadImageToStorage(
+  file:        File,
+  type:        "cover" | "screenshot",
+  accessToken: string,
+  index?:      number,
+): Promise<{ url: string } | { error: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("type", type);
+  if (index !== undefined) fd.append("index", String(index));
+
+  const res = await fetch("/api/games/upload-cover", {
+    method:  "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body:    fd,
+  });
+  const data = await res.json() as { url?: string; error?: string };
+  if (!res.ok) return { error: data.error ?? "Upload failed." };
+  return { url: data.url! };
+}
 
 async function publishGameToSupabase(
   game:        GameListing,
@@ -42,6 +137,8 @@ async function publishGameToSupabase(
         developer_username: game.developerUsername,
         external_play_url:  game.externalPlayUrl,
         trailer_url:        game.trailerUrl,
+        cover_image_url:    game.coverImageUrl ?? null,
+        screenshot_urls:    game.screenshotUrls ?? [],
         is_published:       game.visibility === "published",
         network:            SOLANA_NETWORK,
       }),
@@ -60,59 +157,7 @@ async function publishGameToSupabase(
   }
 }
 
-const ENGINES = [
-  "HTML5 / Browser",
-  "Godot",
-  "Unity",
-  "Unreal Engine",
-  "GameMaker",
-  "Construct",
-  "Ren'Py",
-  "RPG Maker",
-  "Pygame / Python",
-  "Custom engine",
-  "Other",
-];
-
-const BUILD_TYPES = [
-  { id: "html5",   label: "HTML5 / Browser playable" },
-  { id: "webgl",   label: "WebGL build" },
-  { id: "win",     label: "Windows (.exe / .zip)" },
-  { id: "mac",     label: "macOS (.app / .zip)" },
-  { id: "linux",   label: "Linux (.zip / AppImage)" },
-  { id: "android", label: "Android (.apk)" },
-  { id: "source",  label: "Source code" },
-];
-
-const GENRES = [
-  "Platformer", "Puzzle", "Horror", "Adventure", "RPG", "Simulation",
-  "Strategy", "Farming / Cozy", "Visual Novel", "Shooter", "Arcade",
-  "Sports", "Educational", "Other",
-];
-
-const PLATFORMS = [
-  "Windows",
-  "macOS",
-  "Linux",
-  "Web / HTML5",
-  "Android",
-  "Cross-platform",
-];
-
-interface Errors {
-  title?: string;
-  shortDesc?: string;
-  gameStatus?: string;
-  engine?: string;
-  downloadUrl?: string;
-  priceSol?: string;
-  payoutWallet?: string;
-}
-
-function FieldError({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return <p className="mt-1 font-sans text-xs text-nr-red">{msg}</p>;
-}
+// ── Upload page ────────────────────────────────────────────────────────────
 
 export default function UploadPage() {
   const { user, session, isAuthenticated, isLoading } = useAuth();
@@ -120,7 +165,7 @@ export default function UploadPage() {
   const { publicKey } = useWallet();
   const router = useRouter();
 
-  // Form fields
+  // Basic info
   const [title,           setTitle]           = useState("");
   const [shortDesc,       setShortDesc]       = useState("");
   const [fullDesc,        setFullDesc]        = useState("");
@@ -129,45 +174,63 @@ export default function UploadPage() {
   const [genre,           setGenre]           = useState("");
   const [tags,            setTags]            = useState("");
   const [buildTypes,      setBuildTypes]      = useState<string[]>([]);
+
+  // Media
+  const [coverImage,        setCoverImage]        = useState<File | null>(null);
+  const [coverPreview,      setCoverPreview]      = useState<string>("");
+  const [screenshots,       setScreenshots]       = useState<File[]>([]);
+  const [screenshotPreviews, setScreenshotPreviews] = useState<string[]>([]);
+
+  // Download & platform
   const [platform,        setPlatform]        = useState("");
   const [downloadUrl,     setDownloadUrl]     = useState("");
   const [fileSizeLabel,   setFileSizeLabel]   = useState("");
   const [version,         setVersion]         = useState("");
+
+  // Pricing
   const [pricing,         setPricing]         = useState<"free" | "paid-sol">("free");
   const [priceSol,        setPriceSol]        = useState("");
   const [payoutWallet,    setPayoutWallet]    = useState("");
+
+  // Assets links
   const [trailerUrl,      setTrailerUrl]      = useState("");
   const [externalPlayUrl, setExternalPlayUrl] = useState("");
+
+  // Form state
   const [errors,          setErrors]          = useState<Errors>({});
   const [publishedGame,   setPublishedGame]   = useState<GameListing | null>(null);
   const [isSaving,        setIsSaving]        = useState(false);
+  const [savingStep,      setSavingStep]      = useState("");
   const [publishError,    setPublishError]    = useState("");
+
+  const coverInputRef      = useRef<HTMLInputElement>(null);
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
 
   // Auth guard
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.replace("/login");
   }, [isLoading, isAuthenticated, router]);
 
-  // Production debug
-  useEffect(() => {
-    console.log("[UploadPage] user", user?.id);
-    console.log("[UploadPage] profile", profile);
-    console.log("[UploadPage] isLoading", isLoading);
-  }, [user, profile, isLoading]);
-
-  // Auto-fill payout wallet from connected wallet when pricing switches to paid
+  // Auto-fill payout wallet
   useEffect(() => {
     if (pricing === "paid-sol" && publicKey && !payoutWallet) {
       setPayoutWallet(publicKey.toBase58());
     }
   }, [pricing, publicKey, payoutWallet]);
 
-  // Keep payout wallet in sync if wallet connects while paid is selected
   useEffect(() => {
     if (pricing === "paid-sol" && publicKey) {
       setPayoutWallet(publicKey.toBase58());
     }
   }, [publicKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+      screenshotPreviews.forEach((p) => URL.revokeObjectURL(p));
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleBuildType(id: string) {
     setBuildTypes((prev) =>
@@ -175,8 +238,59 @@ export default function UploadPage() {
     );
   }
 
-  // Non-web platforms require a download URL
   const isNonWeb = platform !== "" && platform !== "Web / HTML5";
+
+  // ── Cover image handlers ─────────────────────────────────────────────────
+
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const err = validateImageFile(file);
+    if (err) {
+      setErrors((p) => ({ ...p, coverImage: err }));
+      return;
+    }
+    setErrors((p) => ({ ...p, coverImage: undefined }));
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    setCoverImage(file);
+    setCoverPreview(URL.createObjectURL(file));
+    // Reset input so selecting the same file again triggers onChange
+    if (coverInputRef.current) coverInputRef.current.value = "";
+  }
+
+  function removeCover() {
+    if (coverPreview) URL.revokeObjectURL(coverPreview);
+    setCoverImage(null);
+    setCoverPreview("");
+  }
+
+  // ── Screenshot handlers ──────────────────────────────────────────────────
+
+  function handleScreenshotsChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    const remaining = MAX_SCREENSHOTS - screenshots.length;
+    const toAdd = files.slice(0, remaining);
+
+    const validated: File[] = [];
+    for (const f of toAdd) {
+      if (!validateImageFile(f)) validated.push(f);
+    }
+
+    setScreenshots((prev) => [...prev, ...validated]);
+    setScreenshotPreviews((prev) => [
+      ...prev,
+      ...validated.map((f) => URL.createObjectURL(f)),
+    ]);
+    if (screenshotInputRef.current) screenshotInputRef.current.value = "";
+  }
+
+  function removeScreenshot(index: number) {
+    URL.revokeObjectURL(screenshotPreviews[index]);
+    setScreenshots((prev) => prev.filter((_, i) => i !== index));
+    setScreenshotPreviews((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // ── Validation ────────────────────────────────────────────────────────────
 
   function validate(): Errors {
     const e: Errors = {};
@@ -184,6 +298,7 @@ export default function UploadPage() {
     if (!shortDesc.trim()) e.shortDesc  = "Short description is required.";
     if (!gameStatus)       e.gameStatus = "Please select a game status.";
     if (!engine)           e.engine     = "Please select an engine.";
+    if (!coverImage)       e.coverImage = "A cover image is required.";
     if (isNonWeb && !downloadUrl.trim())
       e.downloadUrl = "A download URL is required for non-web games.";
     if (downloadUrl.trim() && !/^https?:\/\/.+/.test(downloadUrl.trim()))
@@ -197,18 +312,56 @@ export default function UploadPage() {
     return e;
   }
 
+  // ── Submit ────────────────────────────────────────────────────────────────
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      // Scroll to the first error
+      const el = document.querySelector("[data-field-error]");
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setErrors({});
     setPublishError("");
     setIsSaving(true);
 
-    const tagList = tags
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const token = session?.access_token ?? "";
+
+    // 1. Upload cover image
+    let coverImageUrl: string | undefined;
+    if (coverImage) {
+      setSavingStep("Uploading cover image…");
+      const result = await uploadImageToStorage(coverImage, "cover", token);
+      if ("error" in result) {
+        setPublishError(`Cover upload failed: ${result.error}`);
+        setIsSaving(false);
+        setSavingStep("");
+        return;
+      }
+      coverImageUrl = result.url;
+    }
+
+    // 2. Upload screenshots
+    const screenshotUrls: string[] = [];
+    if (screenshots.length > 0) {
+      setSavingStep(`Uploading screenshots…`);
+      for (let i = 0; i < screenshots.length; i++) {
+        const result = await uploadImageToStorage(screenshots[i], "screenshot", token, i);
+        if ("error" in result) {
+          // Non-fatal — skip this screenshot
+          console.warn(`[upload] Screenshot ${i} failed:`, result.error);
+          continue;
+        }
+        screenshotUrls.push(result.url);
+      }
+    }
+
+    // 3. Save to localStorage and Supabase
+    setSavingStep("Publishing…");
+    const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
 
     const game = saveGame({
       title:             title.trim(),
@@ -229,11 +382,14 @@ export default function UploadPage() {
       developerUsername: user?.username ?? "",
       externalPlayUrl:   externalPlayUrl.trim(),
       trailerUrl:        trailerUrl.trim(),
+      coverImageUrl,
+      screenshotUrls,
       visibility:        "published",
     });
 
-    const result = await publishGameToSupabase(game, session?.access_token ?? "");
+    const result = await publishGameToSupabase(game, token);
     setIsSaving(false);
+    setSavingStep("");
 
     if (!result.ok) {
       setPublishError(result.error ?? "Failed to save game. Please try again.");
@@ -243,7 +399,7 @@ export default function UploadPage() {
     setPublishedGame(game);
   }
 
-  // ── Loading / auth guard UI ────────────────────────────────────────────────
+  // ── Loading / auth guard UI ────────────────────────────────────────────
 
   if (isLoading) {
     return (
@@ -279,7 +435,7 @@ export default function UploadPage() {
     );
   }
 
-  // ── Success screen ─────────────────────────────────────────────────────────
+  // ── Success screen ───────────────────────────────────────────────────────
 
   if (publishedGame) {
     return (
@@ -307,7 +463,13 @@ export default function UploadPage() {
             )}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <button
-                onClick={() => setPublishedGame(null)}
+                onClick={() => {
+                  setCoverImage(null);
+                  setCoverPreview("");
+                  setScreenshots([]);
+                  setScreenshotPreviews([]);
+                  setPublishedGame(null);
+                }}
                 className="rounded-lg border border-nr-border px-5 py-2.5 font-sans text-sm font-semibold text-nr-ink hover:bg-nr-surface transition-colors"
               >
                 Upload another game
@@ -326,10 +488,12 @@ export default function UploadPage() {
     );
   }
 
-  // ── Form ───────────────────────────────────────────────────────────────────
+  // ── Form ─────────────────────────────────────────────────────────────────
 
   const inputCls = (err?: string) =>
     `w-full rounded-lg border bg-white px-4 py-2.5 font-sans text-sm text-nr-ink placeholder-nr-placeholder outline-none transition-colors focus:ring-2 ${err ? "border-nr-red focus:border-nr-red focus:ring-nr-red/10" : "border-nr-border focus:border-nr-red focus:ring-nr-red/10"}`;
+
+  void profile;
 
   return (
     <>
@@ -366,7 +530,9 @@ export default function UploadPage() {
                     placeholder="My Awesome Game"
                     className={inputCls(errors.title)}
                   />
-                  <FieldError msg={errors.title} />
+                  <div data-field-error={errors.title ? "1" : undefined}>
+                    <FieldError msg={errors.title} />
+                  </div>
                 </div>
 
                 <div>
@@ -382,7 +548,9 @@ export default function UploadPage() {
                     className={inputCls(errors.shortDesc)}
                   />
                   <div className="flex items-center justify-between mt-1">
-                    <FieldError msg={errors.shortDesc} />
+                    <div data-field-error={errors.shortDesc ? "1" : undefined}>
+                      <FieldError msg={errors.shortDesc} />
+                    </div>
                     <span className="ml-auto font-sans text-xs text-nr-faint">{shortDesc.length}/120</span>
                   </div>
                 </div>
@@ -415,7 +583,9 @@ export default function UploadPage() {
                         <option key={eng} value={eng}>{eng}</option>
                       ))}
                     </select>
-                    <FieldError msg={errors.engine} />
+                    <div data-field-error={errors.engine ? "1" : undefined}>
+                      <FieldError msg={errors.engine} />
+                    </div>
                   </div>
 
                   <div>
@@ -450,7 +620,9 @@ export default function UploadPage() {
                     <option value="early-access">Early Access — Playable but still in development</option>
                     <option value="released">Released — Feature-complete and ready to play</option>
                   </select>
-                  <FieldError msg={errors.gameStatus} />
+                  <div data-field-error={errors.gameStatus ? "1" : undefined}>
+                    <FieldError msg={errors.gameStatus} />
+                  </div>
                 </div>
 
                 <div>
@@ -498,29 +670,138 @@ export default function UploadPage() {
               </div>
             </fieldset>
 
-            {/* ── Assets ──────────────────────────────────────────────────── */}
+            {/* ── Media ───────────────────────────────────────────────────── */}
             <fieldset className="rounded-xl border border-nr-border bg-white p-6 shadow-card">
               <legend className="px-1 font-sans text-sm font-semibold text-nr-ink">
-                Assets
+                Media
               </legend>
-              <div className="mt-4 flex flex-col gap-5">
+              <div className="mt-4 flex flex-col gap-6">
 
+                {/* Cover image */}
                 <div>
                   <label className="block font-sans text-xs font-semibold uppercase tracking-wide text-nr-muted mb-1.5">
-                    External playable link
+                    Cover image <span className="text-nr-red">*</span>
                   </label>
-                  <input
-                    type="url"
-                    value={externalPlayUrl}
-                    onChange={(e) => setExternalPlayUrl(e.target.value)}
-                    placeholder="https://itch.io/embed-upload/… or your own host"
-                    className={inputCls()}
-                  />
-                  <p className="mt-1 font-sans text-xs text-nr-faint">
-                    Optional. For HTML5 builds hosted externally.
+
+                  {coverPreview ? (
+                    <div className="relative overflow-hidden rounded-lg border border-nr-border">
+                      <img
+                        src={coverPreview}
+                        alt="Cover preview"
+                        className="h-48 w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeCover}
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-nr-ink shadow-sm transition-colors hover:bg-white"
+                        aria-label="Remove cover image"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                          <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                      <div className="absolute bottom-2 left-2 rounded-full bg-black/50 px-2 py-0.5 font-sans text-[10px] text-white backdrop-blur-sm">
+                        {coverImage?.name}
+                      </div>
+                    </div>
+                  ) : (
+                    <label
+                      className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-10 transition-colors ${
+                        errors.coverImage
+                          ? "border-nr-red bg-red-50"
+                          : "border-nr-border hover:border-nr-ring hover:bg-nr-surface"
+                      }`}
+                    >
+                      <input
+                        ref={coverInputRef}
+                        type="file"
+                        accept={ACCEPTED_IMAGE_TYPES}
+                        onChange={handleCoverChange}
+                        className="sr-only"
+                      />
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-nr-border bg-nr-surface">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-nr-muted">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                      </div>
+                      <div className="text-center">
+                        <p className="font-sans text-sm font-semibold text-nr-ink">
+                          Click to upload cover image
+                        </p>
+                        <p className="mt-0.5 font-sans text-xs text-nr-faint">
+                          JPG, PNG, or WebP · Max 4 MB · Recommended 1280×720 or 16:9
+                        </p>
+                      </div>
+                    </label>
+                  )}
+                  <div data-field-error={errors.coverImage ? "1" : undefined}>
+                    <FieldError msg={errors.coverImage} />
+                  </div>
+                </div>
+
+                {/* Screenshots */}
+                <div>
+                  <label className="block font-sans text-xs font-semibold uppercase tracking-wide text-nr-muted mb-1.5">
+                    Screenshots{" "}
+                    <span className="font-normal normal-case text-nr-faint">
+                      (optional, up to {MAX_SCREENSHOTS})
+                    </span>
+                  </label>
+
+                  {screenshotPreviews.length > 0 && (
+                    <div className="mb-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                      {screenshotPreviews.map((preview, i) => (
+                        <div key={i} className="group relative">
+                          <img
+                            src={preview}
+                            alt={`Screenshot ${i + 1}`}
+                            className="h-20 w-full rounded-lg border border-nr-border object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeScreenshot(i)}
+                            className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-nr-border bg-white text-nr-ink shadow-sm transition-opacity"
+                            aria-label={`Remove screenshot ${i + 1}`}
+                          >
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+                              <path d="M1 1l6 6M7 1l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {screenshots.length < MAX_SCREENSHOTS && (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-nr-border px-4 py-3 transition-colors hover:border-nr-ring hover:bg-nr-surface">
+                      <input
+                        ref={screenshotInputRef}
+                        type="file"
+                        accept={ACCEPTED_IMAGE_TYPES}
+                        multiple
+                        onChange={handleScreenshotsChange}
+                        className="sr-only"
+                      />
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-nr-muted">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      <span className="font-sans text-sm text-nr-body">
+                        Add screenshots{" "}
+                        <span className="text-nr-faint">
+                          ({screenshots.length}/{MAX_SCREENSHOTS})
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                  <p className="mt-1.5 font-sans text-xs text-nr-faint">
+                    JPG, PNG, or WebP · Max 4 MB each.
                   </p>
                 </div>
 
+                {/* Trailer link */}
                 <div>
                   <label className="block font-sans text-xs font-semibold uppercase tracking-wide text-nr-muted mb-1.5">
                     Trailer / video link
@@ -537,9 +818,21 @@ export default function UploadPage() {
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-nr-border bg-nr-surface p-4 font-sans text-xs text-nr-muted">
-                  Cover image and file uploads require a backend storage provider (e.g. S3, Cloudflare R2).
-                  Coming soon — for now, add a download URL below.
+                {/* External play link */}
+                <div>
+                  <label className="block font-sans text-xs font-semibold uppercase tracking-wide text-nr-muted mb-1.5">
+                    External playable link
+                  </label>
+                  <input
+                    type="url"
+                    value={externalPlayUrl}
+                    onChange={(e) => setExternalPlayUrl(e.target.value)}
+                    placeholder="https://itch.io/embed-upload/… or your own host"
+                    className={inputCls()}
+                  />
+                  <p className="mt-1 font-sans text-xs text-nr-faint">
+                    Optional. For HTML5 builds hosted externally.
+                  </p>
                 </div>
               </div>
             </fieldset>
@@ -596,7 +889,9 @@ export default function UploadPage() {
                     placeholder="https://drive.google.com/uc?export=download&id=…"
                     className={inputCls(errors.downloadUrl)}
                   />
-                  <FieldError msg={errors.downloadUrl} />
+                  <div data-field-error={errors.downloadUrl ? "1" : undefined}>
+                    <FieldError msg={errors.downloadUrl} />
+                  </div>
                   <div className="mt-1.5 rounded-lg border border-nr-indigoborder bg-nr-indigobg px-3 py-2 font-sans text-xs text-nr-indigo">
                     <strong>Google Drive:</strong> Upload your file → Share → &quot;Anyone with the link&quot; → copy link.
                     Then change <code className="font-mono bg-white/60 px-1 rounded">/file/d/ID/view</code> to{" "}
@@ -741,7 +1036,7 @@ export default function UploadPage() {
                     disabled={isSaving}
                     className="rounded-lg bg-nr-red px-7 py-2.5 font-sans text-sm font-semibold text-white shadow-sm hover:bg-nr-redhover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {isSaving ? "Saving…" : "Publish game"}
+                    {isSaving ? (savingStep || "Saving…") : "Publish game"}
                   </button>
                 </div>
               </div>

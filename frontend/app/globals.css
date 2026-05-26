@@ -9,6 +9,7 @@
 
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 3.5rem; /* offset for the 56px sticky header */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

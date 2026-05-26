@@ -12,6 +12,9 @@ export interface GameListing {
   tags: string[];
   gameStatus: "prototype" | "demo" | "early-access" | "released";
   buildTypes: string[];
+  // Media
+  coverImageUrl?: string;    // Supabase Storage URL or local /images/games/… path
+  screenshotUrls?: string[]; // Up to 5 screenshot URLs
   // Download info
   platform: string;        // "Windows" | "macOS" | "Linux" | "Web/HTML5" | "Android" | "Cross-platform" | ""
   downloadUrl: string;     // Public URL to download the game file (Google Drive, Supabase, etc.)

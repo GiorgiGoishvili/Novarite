@@ -31,6 +31,8 @@ interface GamesRow {
   developer_username: string | null;
   external_play_url:  string | null;
   trailer_url:        string | null;
+  cover_image_url:    string | null;
+  screenshot_urls:    string[] | null;
   is_published:       boolean;
   created_at:         string;
 }
@@ -56,6 +58,8 @@ function rowToGameListing(row: GamesRow): GameListing {
     developerUsername: row.developer_username ?? "",
     externalPlayUrl:  row.external_play_url  ?? "",
     trailerUrl:       row.trailer_url        ?? "",
+    coverImageUrl:    row.cover_image_url    ?? undefined,
+    screenshotUrls:   row.screenshot_urls    ?? [],
     visibility:       row.is_published ? "published" : "draft",
     createdAt:        row.created_at,
   };
@@ -69,7 +73,8 @@ export async function GET() {
         "local_game_id, title, short_desc, description, engine, genre, tags, " +
         "game_status, build_types, platform, download_url, file_size_label, " +
         "game_version, pricing, price_sol, developer_wallet, developer_username, " +
-        "external_play_url, trailer_url, is_published, created_at"
+        "external_play_url, trailer_url, cover_image_url, screenshot_urls, " +
+        "is_published, created_at"
       )
       .eq("is_published", true)
       .not("local_game_id", "is", null)

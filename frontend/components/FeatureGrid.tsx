@@ -1,65 +1,109 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 
 const ENGINES = [
   {
-    icon: "🌐",
-    name: "HTML5 / Browser",
+    icon:        "🌐",
+    logo:        "/images/engines/html5.png",
+    name:        "HTML5 / Browser",
     description: "Runs instantly in any browser. Zero download required — share a link and players can start immediately.",
-    color: "bg-blue-50 border-blue-100",
-    iconBg: "bg-blue-100",
+    color:       "bg-blue-50 border-blue-100",
+    iconBg:      "bg-blue-100",
   },
   {
-    icon: "🔵",
-    name: "Godot",
+    icon:        "🔵",
+    logo:        "/images/engines/godot.png",
+    name:        "Godot",
     description: "Export to HTML5, Windows, Mac, or Linux. Fully open source and indie-developer friendly.",
-    color: "bg-indigo-50 border-indigo-100",
-    iconBg: "bg-indigo-100",
+    color:       "bg-indigo-50 border-indigo-100",
+    iconBg:      "bg-indigo-100",
   },
   {
-    icon: "⚙️",
-    name: "Unity",
+    icon:        "⚙️",
+    logo:        "/images/engines/unity.svg",
+    name:        "Unity",
     description: "Upload WebGL builds for browser play or package Windows, Mac, and Linux downloads.",
-    color: "bg-gray-50 border-gray-200",
-    iconBg: "bg-gray-100",
+    color:       "bg-gray-50 border-gray-200",
+    iconBg:      "bg-gray-100",
   },
   {
-    icon: "🎮",
-    name: "Unreal Engine",
+    icon:        "🎮",
+    logo:        "/images/engines/unreal.png",
+    name:        "Unreal Engine",
     description: "Share high-fidelity experiences as packaged downloads. HTML5 export support for web builds.",
-    color: "bg-slate-50 border-slate-100",
-    iconBg: "bg-slate-100",
+    color:       "bg-slate-50 border-slate-100",
+    iconBg:      "bg-slate-100",
   },
   {
-    icon: "👾",
-    name: "GameMaker",
+    icon:        "👾",
+    logo:        "/images/engines/gamemaker.webp",
+    name:        "GameMaker",
     description: "Perfect for 2D indie games and jam projects. Upload HTML5 exports for instant browser play.",
-    color: "bg-green-50 border-green-100",
-    iconBg: "bg-green-100",
+    color:       "bg-green-50 border-green-100",
+    iconBg:      "bg-green-100",
   },
   {
-    icon: "🟡",
-    name: "Construct",
+    icon:        "🟡",
+    logo:        "/images/engines/construct.svg",
+    name:        "Construct",
     description: "Export HTML5 directly and publish in minutes. Great for event-based 2D games.",
-    color: "bg-yellow-50 border-yellow-100",
-    iconBg: "bg-yellow-100",
+    color:       "bg-yellow-50 border-yellow-100",
+    iconBg:      "bg-yellow-100",
   },
   {
-    icon: "📖",
-    name: "Ren'Py",
+    icon:        "📖",
+    logo:        "/images/engines/renpy.png",
+    name:        "Ren'Py",
     description: "Visual novels and interactive stories. Package your project and let readers discover it.",
-    color: "bg-pink-50 border-pink-100",
-    iconBg: "bg-pink-100",
+    color:       "bg-pink-50 border-pink-100",
+    iconBg:      "bg-pink-100",
   },
   {
-    icon: "📦",
-    name: "ZIP / EXE / Any Engine",
+    icon:        "📦",
+    logo:        undefined,          // no logo file yet — shows emoji fallback
+    name:        "ZIP / EXE / Any Engine",
     description: "Custom engine, proprietary tools, anything else — upload a ZIP or EXE and players can download it.",
-    color: "bg-orange-50 border-orange-100",
-    iconBg: "bg-orange-100",
+    color:       "bg-orange-50 border-orange-100",
+    iconBg:      "bg-orange-100",
   },
 ];
+
+function EngineIcon({
+  logo,
+  emoji,
+  name,
+}: {
+  logo:  string | undefined;
+  emoji: string;
+  name:  string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Catch images that fail before React finishes hydration — the native
+  // onerror fires too early in that case and the handler isn't attached yet.
+  useEffect(() => {
+    const el = imgRef.current;
+    if (el && el.complete && el.naturalWidth === 0) {
+      setFailed(true);
+    }
+  }, []);
+
+  if (logo && !failed) {
+    return (
+      <img
+        ref={imgRef}
+        src={logo}
+        alt={name}
+        className="h-7 w-7 object-contain"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return <span aria-hidden="true">{emoji}</span>;
+}
 
 const container = {
   hidden: {},
@@ -111,7 +155,7 @@ export default function FeatureGrid() {
               className={`card-hover flex flex-col gap-3 rounded-xl border bg-white p-5 ${engine.color}`}
             >
               <div className={`flex h-10 w-10 items-center justify-center rounded-lg text-xl ${engine.iconBg}`}>
-                {engine.icon}
+                <EngineIcon logo={engine.logo} emoji={engine.icon} name={engine.name} />
               </div>
               <div>
                 <h3 className="font-sans text-sm font-semibold text-nr-ink">

@@ -57,6 +57,9 @@ interface BrowsableGame {
   version: string;           // e.g. "1.0"
   coverColor: string;
   coverEmoji: string;
+  coverImageUrl?: string;    // Real cover image — shown instead of gradient when present
+  screenshotUrls?: string[]; // Up to 5 screenshots
+  fullDesc?: string;         // Full store description (shown in details view)
   source: "local" | "onchain" | "supabase";
 }
 
@@ -98,6 +101,9 @@ function localToBrowsable(g: GameListing, src: BrowsableGame["source"] = "local"
     version:         g.version         ?? "",
     coverColor:      coverColor(g.id),
     coverEmoji:      coverEmoji(g.id),
+    coverImageUrl:   g.coverImageUrl,
+    screenshotUrls:  g.screenshotUrls  ?? [],
+    fullDesc:        g.fullDesc,
     source:          src,
   };
 }
@@ -482,43 +488,67 @@ const STATUS_STYLE: Record<string, string> = {
   released:     "bg-green-100 text-green-700",
 };
 
-function GameCard({ game, userId }: { game: BrowsableGame; userId: string | null }) {
+function GameCard({
+  game,
+  userId,
+  onSelect,
+}: {
+  game:     BrowsableGame;
+  userId:   string | null;
+  onSelect: (game: BrowsableGame) => void;
+}) {
   return (
     <motion.div
       variants={item}
-      className="card-hover flex flex-col overflow-hidden rounded-xl border border-nr-border bg-white shadow-card"
+      className="group card-hover flex flex-col overflow-hidden rounded-xl border border-nr-border bg-white shadow-card cursor-pointer"
+      onClick={() => onSelect(game)}
     >
       {/* Cover */}
-      <div
-        className="relative h-44 w-full overflow-hidden"
-        style={{
-          background: `linear-gradient(135deg, ${game.coverColor}33 0%, ${game.coverColor}99 100%)`,
-        }}
-      >
+      <div className="relative h-44 w-full overflow-hidden">
+        {/* Real cover image or gradient placeholder */}
+        {game.coverImageUrl ? (
+          <img
+            src={game.coverImageUrl}
+            alt={`${game.title} cover`}
+            loading="lazy"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+          />
+        ) : (
+          <div
+            className="h-full w-full transition-transform duration-500 ease-out group-hover:scale-105"
+            style={{
+              background: `linear-gradient(135deg, ${game.coverColor}33 0%, ${game.coverColor}99 100%)`,
+            }}
+          >
+            <span
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none text-7xl opacity-30"
+              aria-hidden="true"
+            >
+              {game.coverEmoji}
+            </span>
+          </div>
+        )}
+
+        {/* Engine badge */}
         <span className="absolute left-3 top-3 rounded-full border border-white/40 bg-white/70 px-2 py-0.5 font-mono text-[10px] font-medium text-nr-body backdrop-blur-sm">
           {game.engine}
         </span>
 
-        {/* Platform badge */}
-        {game.platform && (
-          <span className={`absolute left-3 bottom-3 rounded-full px-2 py-0.5 font-sans text-[10px] font-semibold ${PLATFORM_STYLE[game.platform] ?? "bg-gray-100 text-gray-700"}`}>
-            {game.platform}
-          </span>
-        )}
-
+        {/* Price badge */}
         {game.pricing !== "free" && game.priceSol > 0 && (
           <span className="absolute right-3 top-3 rounded-full bg-nr-ink/80 px-2 py-0.5 font-sans text-[10px] font-semibold text-white backdrop-blur-sm">
             {game.priceSol} SOL
           </span>
         )}
 
-        <span
-          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none text-7xl opacity-30"
-          aria-hidden="true"
-        >
-          {game.coverEmoji}
-        </span>
+        {/* Platform badge */}
+        {game.platform && (
+          <span className={`absolute bottom-3 left-3 rounded-full px-2 py-0.5 font-sans text-[10px] font-semibold ${PLATFORM_STYLE[game.platform] ?? "bg-gray-100 text-gray-700"}`}>
+            {game.platform}
+          </span>
+        )}
 
+        {/* Browser-playable badge */}
         {game.externalPlayUrl && (
           <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 font-sans text-[10px] font-medium text-nr-body backdrop-blur-sm">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
@@ -529,6 +559,13 @@ function GameCard({ game, userId }: { game: BrowsableGame; userId: string | null
             Plays in browser
           </span>
         )}
+
+        {/* View-details overlay — appears on card hover */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-300 group-hover:bg-black/25">
+          <span className="translate-y-2 font-sans text-sm font-semibold text-white opacity-0 drop-shadow-sm transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+            View details →
+          </span>
+        </div>
       </div>
 
       {/* Info */}
@@ -566,7 +603,7 @@ function GameCard({ game, userId }: { game: BrowsableGame; userId: string | null
           {game.shortDesc}
         </p>
 
-        <div className="mt-auto">
+        <div className="mt-auto" onClick={(e) => e.stopPropagation()}>
           <BuyButton game={game} userId={userId} />
         </div>
       </div>
@@ -574,12 +611,219 @@ function GameCard({ game, userId }: { game: BrowsableGame; userId: string | null
   );
 }
 
+// ─── GameDetailsModal ─────────────────────────────────────────────────────────
+
+function GameDetailsModal({
+  game,
+  userId,
+  onClose,
+}: {
+  game:    BrowsableGame;
+  userId:  string | null;
+  onClose: () => void;
+}) {
+  // Lock body scroll while open; restore on unmount
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const descParagraphs = (game.fullDesc ?? game.shortDesc)
+    .split("\n\n")
+    .filter(Boolean);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Backdrop — click to dismiss */}
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Dialog panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.2, ease: [0.21, 0.47, 0.32, 0.98] }}
+        className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-card-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ── Cover image ─────────────────────────────────────────── */}
+        <div className="relative h-64 w-full shrink-0 overflow-hidden rounded-t-2xl">
+          {game.coverImageUrl ? (
+            <img
+              src={game.coverImageUrl}
+              alt={`${game.title} cover`}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div
+              className="h-full w-full"
+              style={{ background: `linear-gradient(135deg, ${game.coverColor}33 0%, ${game.coverColor}99 100%)` }}
+            >
+              <span
+                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none text-9xl opacity-20"
+                aria-hidden="true"
+              >
+                {game.coverEmoji}
+              </span>
+            </div>
+          )}
+
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {/* Engine badge */}
+          <span className="absolute bottom-3 left-3 rounded-full border border-white/40 bg-white/70 px-2 py-0.5 font-mono text-[10px] font-medium text-nr-body backdrop-blur-sm">
+            {game.engine}
+          </span>
+
+          {/* Free / price badge */}
+          {game.pricing === "free" ? (
+            <span className="absolute bottom-3 right-3 rounded-full bg-green-700/80 px-2.5 py-0.5 font-sans text-xs font-semibold text-white backdrop-blur-sm">
+              Free
+            </span>
+          ) : game.priceSol > 0 ? (
+            <span className="absolute bottom-3 right-3 rounded-full bg-nr-ink/80 px-2.5 py-0.5 font-sans text-xs font-semibold text-white backdrop-blur-sm">
+              {game.priceSol} SOL
+            </span>
+          ) : null}
+        </div>
+
+        {/* ── Body ────────────────────────────────────────────────── */}
+        <div className="p-6">
+          {/* Title + developer */}
+          <h2 className="font-sans text-2xl font-extrabold leading-tight text-nr-ink">
+            {game.title}
+          </h2>
+          <p className="mt-1 font-sans text-sm text-nr-muted">
+            by {game.developer}
+            {game.version && (
+              <span className="ml-2 font-mono text-xs text-nr-faint">v{game.version}</span>
+            )}
+          </p>
+
+          {/* Platform / genre / tag badges */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {game.platform && (
+              <span className={`rounded-full px-2.5 py-0.5 font-sans text-xs font-semibold ${PLATFORM_STYLE[game.platform] ?? "bg-gray-100 text-gray-700"}`}>
+                {game.platform}
+              </span>
+            )}
+            {game.genre && game.genre !== "Other" && (
+              <span className="rounded-full border border-nr-border bg-nr-surface px-2.5 py-0.5 font-sans text-xs text-nr-muted">
+                {game.genre}
+              </span>
+            )}
+            {game.tags.map((tag) => (
+              <span key={tag} className="rounded-full border border-nr-border bg-nr-surface px-2.5 py-0.5 font-sans text-xs text-nr-muted">
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          {/* Two-column: description + action sidebar */}
+          <div className="mt-6 grid gap-6 md:grid-cols-[1fr_176px]">
+            {/* Description */}
+            <div>
+              <p className="mb-2 font-sans text-[11px] font-semibold uppercase tracking-widest text-nr-faint">
+                About
+              </p>
+              <div className="space-y-3 font-sans text-sm leading-relaxed text-nr-body">
+                {descParagraphs.map((para, i) => (
+                  <p key={i}>{para}</p>
+                ))}
+              </div>
+
+              {/* Screenshots strip */}
+              {game.screenshotUrls && game.screenshotUrls.length > 0 && (
+                <div className="mt-5">
+                  <p className="mb-2.5 font-sans text-[11px] font-semibold uppercase tracking-widest text-nr-faint">
+                    Screenshots
+                  </p>
+                  <div className="flex gap-2.5 overflow-x-auto pb-1">
+                    {game.screenshotUrls.map((url, i) => (
+                      <img
+                        key={i}
+                        src={url}
+                        alt={`Screenshot ${i + 1}`}
+                        className="h-28 w-auto shrink-0 rounded-lg border border-nr-border object-cover"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action sidebar — stop propagation so clicks here don't bubble to backdrop */}
+            <div
+              className="flex flex-col gap-2.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <BuyButton game={game} userId={userId} />
+              {game.fileSizeLabel && (
+                <p className="text-center font-sans text-xs text-nr-faint">
+                  {game.fileSizeLabel}
+                </p>
+              )}
+              {game.externalPlayUrl && (
+                <a
+                  href={game.externalPlayUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-lg border border-nr-border bg-white py-2 font-sans text-sm font-semibold text-nr-ink transition-colors hover:bg-nr-surface"
+                >
+                  Play in browser
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Back to Browse */}
+          <div className="mt-6 border-t border-nr-border pt-5">
+            <button
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 font-sans text-sm text-nr-muted transition-colors hover:text-nr-ink"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back to Browse
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── MarketplacePreview ───────────────────────────────────────────────────────
 
 export default function MarketplacePreview() {
-  const [allGames,    setAllGames]    = useState<BrowsableGame[]>([]);
-  const [activeGenre, setActiveGenre] = useState("All");
-  const [loading,     setLoading]     = useState(true);
+  const [allGames,     setAllGames]     = useState<BrowsableGame[]>([]);
+  const [activeGenre,  setActiveGenre]  = useState("All");
+  const [loading,      setLoading]      = useState(true);
+  const [selectedGame, setSelectedGame] = useState<BrowsableGame | null>(null);
   const { connection } = useConnection();
   const { user } = useAuth();
 
@@ -643,6 +887,8 @@ export default function MarketplacePreview() {
               version:         "",
               coverColor:      g.coverColor,
               coverEmoji:      g.coverEmoji,
+              coverImageUrl:   undefined,
+              screenshotUrls:  [],
               source:          "onchain" as const,
             }));
             setAllGames((prev) => {
@@ -784,12 +1030,21 @@ export default function MarketplacePreview() {
             className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
           >
             {displayed.map((game) => (
-              <GameCard key={game.id} game={game} userId={userId} />
+              <GameCard key={game.id} game={game} userId={userId} onSelect={setSelectedGame} />
             ))}
           </motion.div>
         )}
 
       </div>
+
+      {/* Game details modal — rendered inside the section but uses fixed positioning */}
+      {selectedGame && (
+        <GameDetailsModal
+          game={selectedGame}
+          userId={userId}
+          onClose={() => setSelectedGame(null)}
+        />
+      )}
     </section>
   );
 }

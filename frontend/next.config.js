@@ -7,6 +7,16 @@ const nextConfig = {
     // are not available in the browser.
     serverComponentsExternalPackages: ["twilio"],
   },
+  images: {
+    remotePatterns: [
+      {
+        // Supabase Storage public CDN — covers and screenshots
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;

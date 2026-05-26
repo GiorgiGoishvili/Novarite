@@ -54,6 +54,8 @@ interface PublishBody {
   developer_username?: string;
   external_play_url?:  string;
   trailer_url?:        string;
+  cover_image_url?:    string;
+  screenshot_urls?:    unknown;
   is_published?:       unknown;
   network?:            string;
 }
@@ -187,6 +189,19 @@ export async function POST(request: NextRequest) {
   const isPublished = body.is_published === true || body.is_published === false
     ? Boolean(body.is_published) : true;
 
+  // ── cover_image_url ────────────────────────────────────────────────────
+  const coverImageUrl = typeof body.cover_image_url === "string"
+    ? body.cover_image_url.trim() : null;
+  if (coverImageUrl && !isValidUrl(coverImageUrl))
+    return json({ error: "cover_image_url must be a valid http/https URL." }, 400);
+
+  // ── screenshot_urls ────────────────────────────────────────────────────
+  const screenshotUrls = Array.isArray(body.screenshot_urls)
+    ? (body.screenshot_urls as unknown[])
+        .filter((u) => typeof u === "string" && isValidUrl(u as string))
+        .slice(0, 5) as string[]
+    : [];
+
   // ── Assemble row ───────────────────────────────────────────────────────
   const row = {
     local_game_id:      localGameId,
@@ -208,6 +223,8 @@ export async function POST(request: NextRequest) {
     developer_username: developerUsername || null,
     external_play_url:  externalPlayUrl,
     trailer_url:        trailerUrl,
+    cover_image_url:    coverImageUrl,
+    screenshot_urls:    screenshotUrls,
     is_published:       isPublished,
     network,
     updated_at:         new Date().toISOString(),
