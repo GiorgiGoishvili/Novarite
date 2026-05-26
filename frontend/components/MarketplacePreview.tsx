@@ -9,6 +9,10 @@ import { getPublishedGames, type GameListing } from "@/lib/games";
 import { seedDemoGamesIfNeeded } from "@/lib/seedGames";
 import { savePurchase, getPurchaseForGame, type Purchase } from "@/lib/purchases";
 import { useAuth } from "./AuthProvider";
+import {
+  getReviews, saveReview, hasReviewed, toSlug, getRatingSummary,
+  type GameReview,
+} from "@/lib/reviews";
 
 // ─── animation variants ────────────────────────────────────────────────────────
 
@@ -599,6 +603,8 @@ function GameCard({
           </div>
         )}
 
+        <CompactRating gameTitle={game.title} />
+
         <p className="flex-1 font-sans text-sm leading-relaxed text-nr-body line-clamp-3">
           {game.shortDesc}
         </p>
@@ -608,6 +614,209 @@ function GameCard({
         </div>
       </div>
     </motion.div>
+  );
+}
+
+// ─── StarDisplay ─────────────────────────────────────────────────────────────
+
+function StarDisplay({ rating, size = "sm" }: { rating: number; size?: "sm" | "md" }) {
+  const cls = size === "md" ? "text-base" : "text-xs";
+  return (
+    <span className={`inline-flex gap-0.5 ${cls}`} aria-label={`${rating} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((s) => (
+        <span key={s} className={s <= rating ? "text-amber-400" : "text-gray-200"}>★</span>
+      ))}
+    </span>
+  );
+}
+
+// ─── StarPicker ───────────────────────────────────────────────────────────────
+
+function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <span className="inline-flex gap-0.5" role="group" aria-label="Rating">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => onChange(s)}
+          onMouseEnter={() => setHovered(s)}
+          onMouseLeave={() => setHovered(0)}
+          className={`text-xl transition-colors ${s <= (hovered || value) ? "text-amber-400" : "text-gray-200"}`}
+          aria-label={`${s} star${s !== 1 ? "s" : ""}`}
+        >
+          ★
+        </button>
+      ))}
+    </span>
+  );
+}
+
+// ─── ReviewCard ───────────────────────────────────────────────────────────────
+
+function ReviewCard({ review }: { review: GameReview }) {
+  const initial = review.username.charAt(0).toUpperCase();
+  const date = new Date(review.createdAt).toLocaleDateString("en-GB", {
+    year: "numeric", month: "short", day: "numeric",
+  });
+  return (
+    <div className="flex gap-3 py-4 border-b border-nr-border last:border-0">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-nr-surface font-sans text-sm font-bold text-nr-ink">
+        {initial}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-sans text-sm font-semibold text-nr-ink">{review.username}</span>
+          <StarDisplay rating={review.rating} />
+          {review.recommended && (
+            <span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 font-sans text-[10px] font-semibold text-green-700">
+              Recommended
+            </span>
+          )}
+          <span className="font-sans text-xs text-nr-faint">{date}</span>
+        </div>
+        <p className="mt-1.5 font-sans text-sm leading-relaxed text-nr-body">{review.comment}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── CompactRating ────────────────────────────────────────────────────────────
+
+function CompactRating({ gameTitle }: { gameTitle: string }) {
+  const reviews = getReviews(toSlug(gameTitle));
+  const { avg, count } = getRatingSummary(reviews);
+  if (count === 0) return null;
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-amber-400 text-xs">★</span>
+      <span className="font-sans text-xs font-semibold text-nr-ink">{avg}</span>
+      <span className="font-sans text-xs text-nr-faint">({count})</span>
+    </div>
+  );
+}
+
+// ─── GameReviewsSection ───────────────────────────────────────────────────────
+
+function GameReviewsSection({ gameTitle, userId }: { gameTitle: string; userId: string | null }) {
+  const slug = toSlug(gameTitle);
+  const [reviews, setReviews] = useState<GameReview[]>(() => getReviews(slug));
+  const [rating, setRating]           = useState(0);
+  const [recommended, setRecommended] = useState(true);
+  const [comment, setComment]         = useState("");
+  const [formError, setFormError]     = useState("");
+  const [submitted, setSubmitted]     = useState(false);
+
+  const { avg, count } = getRatingSummary(reviews);
+  const alreadyReviewed = userId ? hasReviewed(userId, slug) : false;
+  const recommendedPct  = count > 0
+    ? Math.round((reviews.filter((r) => r.recommended).length / count) * 100)
+    : 0;
+
+  function handleSubmit() {
+    if (!userId) return;
+    if (rating === 0)             { setFormError("Please select a star rating."); return; }
+    if (comment.trim().length < 5) { setFormError("Please write a comment (at least 5 characters)."); return; }
+    saveReview({ gameSlug: slug, username: userId, rating, recommended, comment: comment.trim() });
+    setReviews(getReviews(slug));
+    setSubmitted(true);
+    setFormError("");
+  }
+
+  return (
+    <div className="mt-6 border-t border-nr-border pt-6">
+      <p className="mb-4 font-sans text-[11px] font-semibold uppercase tracking-widest text-nr-faint">
+        Reviews
+      </p>
+
+      {/* Rating summary */}
+      {count > 0 && (
+        <div className="mb-5 flex items-center gap-4 rounded-xl border border-nr-border bg-nr-surface px-5 py-4">
+          <div className="text-center">
+            <div className="font-sans text-3xl font-extrabold text-nr-ink">{avg}</div>
+            <StarDisplay rating={Math.round(avg)} size="md" />
+            <div className="mt-0.5 font-sans text-xs text-nr-faint">
+              {count} review{count !== 1 ? "s" : ""}
+            </div>
+          </div>
+          <div className="h-12 w-px bg-nr-border" />
+          <p className="font-sans text-sm text-nr-muted">
+            {recommendedPct}% of reviewers recommend this game
+          </p>
+        </div>
+      )}
+
+      {/* Review list */}
+      {reviews.length > 0 ? (
+        <div className="mb-6">
+          {reviews.map((r) => <ReviewCard key={r.id} review={r} />)}
+        </div>
+      ) : (
+        <p className="mb-6 font-sans text-sm text-nr-faint">
+          No reviews yet. Be the first to review!
+        </p>
+      )}
+
+      {/* Submit area */}
+      {!userId ? (
+        <div className="rounded-xl border border-nr-border bg-nr-surface px-5 py-4 text-center">
+          <p className="font-sans text-sm text-nr-muted">
+            <a href="/login" className="font-semibold text-nr-red transition-colors hover:text-nr-redhover">
+              Sign in
+            </a>{" "}
+            to leave a review.
+          </p>
+        </div>
+      ) : alreadyReviewed || submitted ? (
+        <div className="rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-center">
+          <p className="font-sans text-sm font-semibold text-green-700">
+            {submitted ? "Review submitted. Thank you!" : "You've already reviewed this game."}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-nr-border bg-nr-surface p-5">
+          <p className="mb-3 font-sans text-sm font-semibold text-nr-ink">Write a review</p>
+
+          <div className="mb-3 flex items-center gap-3">
+            <span className="font-sans text-xs text-nr-muted">Rating</span>
+            <StarPicker value={rating} onChange={setRating} />
+          </div>
+
+          <div className="mb-3 flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="rec-toggle"
+              checked={recommended}
+              onChange={(e) => setRecommended(e.target.checked)}
+              className="h-4 w-4 accent-nr-red"
+            />
+            <label htmlFor="rec-toggle" className="cursor-pointer select-none font-sans text-xs text-nr-muted">
+              I recommend this game
+            </label>
+          </div>
+
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Share your experience…"
+            rows={3}
+            className="w-full resize-none rounded-lg border border-nr-border bg-white px-3 py-2 font-sans text-sm text-nr-ink placeholder:text-nr-faint focus:border-nr-ring focus:outline-none"
+          />
+
+          {formError && (
+            <p className="mt-1.5 font-sans text-xs text-nr-red">{formError}</p>
+          )}
+
+          <button
+            onClick={handleSubmit}
+            className="mt-3 rounded-lg bg-nr-red px-5 py-2 font-sans text-sm font-semibold text-white transition-colors hover:bg-nr-redhover"
+          >
+            Submit review
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -798,6 +1007,9 @@ function GameDetailsModal({
               )}
             </div>
           </div>
+
+          {/* Reviews */}
+          <GameReviewsSection gameTitle={game.title} userId={userId} />
 
           {/* Back to Browse */}
           <div className="mt-6 border-t border-nr-border pt-5">
