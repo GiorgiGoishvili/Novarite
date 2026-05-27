@@ -23,6 +23,7 @@ export interface GameListing {
   // Pricing
   pricing: "free" | "paid-sol";
   priceSol: number;         // 0 for free games
+  priceUsd?: number;        // USD price for card checkout (optional, prototype only)
   developerWallet: string;  // Solana public key — receives payment for paid games
   developerUsername: string;
   externalPlayUrl: string;

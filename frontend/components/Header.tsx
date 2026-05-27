@@ -36,6 +36,12 @@ export default function Header() {
             AI Discovery
           </a>
           <a
+            href="/feedback"
+            className="rounded-md px-3 py-1.5 font-sans text-sm font-medium text-nr-muted transition-colors duration-150 hover:bg-nr-panel hover:text-nr-ink"
+          >
+            Feedback
+          </a>
+          <a
             href="/upload"
             className="mx-1 rounded-md bg-nr-red px-3.5 py-1.5 font-sans text-sm font-semibold text-white transition-colors duration-150 hover:bg-nr-redhover"
           >
@@ -122,6 +128,13 @@ export default function Header() {
             className="rounded-md px-3 py-2 font-sans text-sm font-medium text-nr-body hover:bg-nr-panel"
           >
             AI Discovery
+          </a>
+          <a
+            href="/feedback"
+            onClick={() => setMobileOpen(false)}
+            className="rounded-md px-3 py-2 font-sans text-sm font-medium text-nr-body hover:bg-nr-panel"
+          >
+            Feedback
           </a>
           <a
             href="/upload"

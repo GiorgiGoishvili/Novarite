@@ -6,7 +6,7 @@ import { saveGame, getPublishedGames, type GameListing } from "./games";
 // IMPORTANT: the SEED_KEY guard must be the first check in seedDemoGamesIfNeeded.
 // Any purge/cleanup that runs before the guard will delete the seeded games on
 // every subsequent page load, making them disappear.
-const SEED_KEY  = "nr_seeded_v8";  // v7 had a bug: purge ran before guard → bump
+const SEED_KEY  = "nr_seeded_v9";  // v9: added priceUsd to Little Runmo for card checkout
 const PURGE_KEY = "nr_purge_v3";
 
 const LITTLE_RUNMO_DOWNLOAD_URL =
@@ -95,6 +95,7 @@ export function seedDemoGamesIfNeeded(): void {
     version:           "1.0",
     pricing:           "paid-sol",
     priceSol:          0.005,
+    priceUsd:          4.99,
     developerWallet:   LITTLE_RUNMO_DEV_WALLET,
     developerUsername: "Novarite Team",
     externalPlayUrl:   "",

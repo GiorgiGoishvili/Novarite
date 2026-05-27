@@ -54,6 +54,7 @@ interface BrowsableGame {
   shortDesc: string;
   pricing: "free" | "paid-sol";
   priceSol: number;
+  priceUsd?: number;
   externalPlayUrl: string;
   platform: string;          // "Windows" | "macOS" | "Linux" | "Web / HTML5" | ""
   downloadUrl: string;       // Direct download URL; empty = no download available
@@ -98,6 +99,7 @@ function localToBrowsable(g: GameListing, src: BrowsableGame["source"] = "local"
     shortDesc:       g.shortDesc,
     pricing:         g.pricing,
     priceSol:        g.priceSol,
+    priceUsd:        g.priceUsd,
     externalPlayUrl: g.externalPlayUrl,
     platform:        g.platform        ?? "",
     downloadUrl:     g.downloadUrl     ?? "",
@@ -990,6 +992,24 @@ function GameDetailsModal({
               onClick={(e) => e.stopPropagation()}
             >
               <BuyButton game={game} userId={userId} />
+
+              {/* Card checkout option — only for paid games with a USD price */}
+              {game.pricing === "paid-sol" && game.priceUsd && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <hr className="flex-1 border-nr-border" />
+                    <span className="font-sans text-[10px] text-nr-faint">or</span>
+                    <hr className="flex-1 border-nr-border" />
+                  </div>
+                  <a
+                    href={`/checkout?gameId=${encodeURIComponent(game.id)}&title=${encodeURIComponent(game.title)}&price=${game.priceUsd}&cover=${encodeURIComponent(game.coverImageUrl ?? "")}&downloadUrl=${encodeURIComponent(game.downloadUrl)}`}
+                    className="block w-full rounded-lg border border-nr-border bg-white py-2 text-center font-sans text-sm font-semibold text-nr-ink transition-colors hover:bg-nr-surface"
+                  >
+                    Pay with Card — ${game.priceUsd}
+                  </a>
+                </>
+              )}
+
               {game.fileSizeLabel && (
                 <p className="text-center font-sans text-xs text-nr-faint">
                   {game.fileSizeLabel}
